@@ -7,6 +7,10 @@
     </x-slot>
 
     <div class="py-6 max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6">
+            @include('websites.partials.module-tabs', ['active' => 'campaign', 'website' => $website])
+        </div>
+
         @if (session('status'))
             <div class="rounded-lg bg-emerald-900/40 border border-emerald-700 px-4 py-3 text-sm text-emerald-200">
                 {{ session('status') }}
@@ -314,8 +318,7 @@
                     <p class="text-sm text-gray-400 mt-2">No findings recorded — every scored criterion reached its threshold for this job.</p>
                 @endif
                 <p class="text-xs text-gray-500 mt-4">
-                    Remaining intelligence modules (predictive analytics, budget tools, wasted-spend, lead readiness detail,
-                    creative analysis, AI advisor) are produced by Phases 4–5 and will appear here once implemented.
+                    The AI Marketing Advisor (evidence-based audit and prioritised action plan) is produced by Phase 5.
                 </p>
             </div>
         @endif

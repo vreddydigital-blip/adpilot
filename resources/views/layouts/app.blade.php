@@ -30,7 +30,7 @@
                         <x-sidebar-link :href="route('profile.edit')" :active="request()->routeIs('profile.*')">Settings</x-sidebar-link>
                     </nav>
                     <div class="px-6 py-4 text-xs text-slate-400 border-t border-slate-800 mt-4">
-                        Portfolio build, Phase 1.
+                        Portfolio build · Phase 4 (AI Advisor in Phase 5)
                     </div>
                 </aside>
 
@@ -48,7 +48,7 @@
                         <x-sidebar-link :href="route('profile.edit')" :active="request()->routeIs('profile.*')">Settings</x-sidebar-link>
                     </nav>
                     <div class="px-6 py-4 text-xs text-slate-400 border-t border-slate-800 mt-auto">
-                        Portfolio build, Phase 1.
+                        Portfolio build · Phase 4 (AI Advisor in Phase 5)
                     </div>
                 </aside>
 

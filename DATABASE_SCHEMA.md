@@ -132,14 +132,14 @@ The per-page `features` JSON on `crawled_pages` is already populated; these norm
 
 Indexes: unique `analysis_job_id`, indexed `website_id` (from FK).
 
-## Intelligence tables (Phase 3 portion)
+## Intelligence tables (Phase 3 + Phase 4 portion)
 
 ### marketing_scores
 
 - `id`, `website_id` (FK, cascade, indexed), `analysis_job_id` (FK, cascade)
-- `module_key` string(60) - e.g. `campaign_readiness`; later phases add more module keys
+- `module_key` string(60) - `campaign_readiness`, `conversion_opportunity` or `lead_intelligence` (Phase 4); later phases add more module keys
 - `score` unsigned tiny int nullable, `methodology` string(80) default `heuristic` (method label stored with the score), `version` string(20) `v1.0` (scoring version)
-- `breakdown` json - for campaign readiness: `criteria[]` (score, weight, evidence, explanation, confidence, recommendation), `confidence`, `methodology`, `summary`
+- `breakdown` json - per module: campaign readiness stores `criteria[]` (score, weight, evidence, explanation, confidence, recommendation), `confidence`, `methodology`, `summary`; conversion opportunity stores `label`, `methodology`, `opportunities[]`, `high`/`medium`/`low` key buckets; lead intelligence stores `label`, `methodology`, `summary`, `forms[]`, `contact_methods`, `confidence`
 - `computed_at` timestamp nullable, timestamps
 
 Constraints: **unique (`analysis_job_id`, `module_key`)** (idempotent re-processing), index (`website_id`, `module_key`), index `website_id`.
@@ -154,10 +154,60 @@ Constraints: **unique (`analysis_job_id`, `module_key`)** (idempotent re-process
 
 Indexes: (`analysis_job_id`, `module_key`), (`website_id`, `priority`), index `website_id`. Insights are replaced (deleted + re-inserted) on each pipeline run for a job, so there is no uniqueness constraint.
 
+## Intelligence tables (created in Phase 4)
+
+### predictive_insights
+
+- `id`, `website_id` (FK, cascade, indexed), `analysis_job_id` (FK, cascade)
+- `opportunity_key` string(60) (e.g. `cta_placement`, `page_performance`), `priority` string(20) (`high`|`medium`|`low`), `title` string(255)
+- `evidence` json nullable, `recommendation` text nullable, `effort` string(20) nullable, `direction` string(40) nullable (`improvement`)
+- `severity`/`impact`/`confidence`/`score` unsigned tiny int nullable (all null when evidence is missing)
+- timestamps
+
+Indexes: (`analysis_job_id`, `priority`), (`website_id`, `priority`). Rows are replaced per job on each pipeline run.
+
+### waste_findings
+
+- `id`, `website_id` (FK, cascade, indexed), `analysis_job_id` (FK, cascade)
+- `finding_key` string(60) (e.g. `technical_https`, `criterion_cta_effectiveness`, `no_obvious_leakage`), `severity` string(20) (`high`|`medium`|`low`), `title` string(255)
+- `evidence` json nullable, `potential_impact` text nullable, `correction` text nullable
+- timestamps
+
+Indexes: (`analysis_job_id`, `severity`), (`website_id`, `severity`). Rows are replaced per job on each pipeline run.
+
+### lead_insights
+
+- `id`, `website_id` (FK, cascade, indexed), `analysis_job_id` (FK, cascade)
+- `insight_key` string(60) (`no_forms`, `form_friction`, `missing_contact_channels`, `homepage_cta_consistency`, `contact_page`), `priority` string(20), `title` string(255)
+- `evidence` json nullable, `recommendation` text nullable, `effort` string(20) nullable
+- timestamps
+
+Indexes: (`analysis_job_id`, `priority`), (`website_id`, `priority`). Rows are replaced per job on each pipeline run.
+
+### creative_insights
+
+- `id`, `website_id` (FK, cascade, indexed), `analysis_job_id` (FK, cascade)
+- `kind` string(60) (`google_headline`, `google_description`, `meta_headline`, `meta_primary_text`, `messaging_angle`, `message_match`)
+- `channel` string(40) nullable (`google`|`meta`; null for angles/match), `headline` string(255) nullable, `text` string(500) nullable
+- `char_length` integer nullable, `payload` json nullable (message-match verdict data)
+- timestamps
+
+Indexes: (`analysis_job_id`, `kind`), (`website_id`, `kind`). Rows are replaced per job on each pipeline run.
+
+### budget_scenarios
+
+- `id`, `website_id` (FK, cascade, indexed), `user_id` (FK, cascade, indexed), `analysis_job_id` (FK, cascade, **nullable** - scenarios are user-assumption math and do not require a completed crawl)
+- `label` string(120), `channel` string(60) default `all`
+- `inputs` json (budget, cpc, lead_rate, conversion_rate, average_order_value, gross_margin, target_cpa), `results` json (source_inputs, channel, scenarios[] with every simulated figure + disclaimer)
+- `methodology` string(80) default `deterministic simulation`, `version` string(20) default `v1.0`
+- timestamps
+
+Indexes: (`website_id`, `created_at`), (`user_id`, `created_at`). Per-user ownership is enforced (website view authorization + user_id match); scenarios are never crawl-derived.
+
 ## Planned tables (created in later phases)
 
 technical: `performance_audits` (deferred until a Lighthouse/PageSpeed-like source exists)
-intelligence: `predictive_insights`, `budget_scenarios`, `waste_findings`, `lead_insights`, `creative_insights`, `recommendations`
+intelligence: `recommendations` (Phase 5 AI Marketing Advisor)
 reporting/admin: `reports`, `integration_settings`
 
 TiDB compatibility notes: the schema uses standard migrations; website URLs exceed TiDB index-key limits only in composite unique constraints, which is why the 64-char `url_hash` is used for the unique key.

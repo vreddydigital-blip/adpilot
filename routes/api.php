@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AnalysisJobApiController;
 use App\Http\Controllers\Api\CrawlerCallbackController;
+use App\Http\Controllers\Api\ModuleIntelligenceApiController;
 use App\Http\Controllers\Api\ProjectApiController;
 use App\Http\Controllers\Api\WebsiteApiController;
 use Illuminate\Support\Facades\Route;
@@ -21,6 +22,22 @@ Route::middleware(['auth:sanctum'])->group(function () {
         ->middleware('throttle:20,1');
     Route::get('/websites/{website}/campaign-intelligence', [WebsiteApiController::class, 'campaignIntelligence'])
         ->middleware('throttle:60,1');
+    Route::get('/websites/{website}/predictive-analytics', [ModuleIntelligenceApiController::class, 'predictiveAnalytics'])
+        ->middleware('throttle:60,1');
+    Route::get('/websites/{website}/lead-intelligence', [ModuleIntelligenceApiController::class, 'leadIntelligence'])
+        ->middleware('throttle:60,1');
+    Route::get('/websites/{website}/wasted-spend', [ModuleIntelligenceApiController::class, 'wastedSpend'])
+        ->middleware('throttle:60,1');
+    Route::get('/websites/{website}/creative-intelligence', [ModuleIntelligenceApiController::class, 'creativeIntelligence'])
+        ->middleware('throttle:60,1');
+    Route::get('/budget-channels', [ModuleIntelligenceApiController::class, 'channelFactors'])
+        ->middleware('throttle:60,1');
+    Route::get('/websites/{website}/budget-intelligence', [ModuleIntelligenceApiController::class, 'budgetScenariosIndex'])
+        ->middleware('throttle:60,1');
+    Route::get('/websites/{website}/budget-scenarios', [ModuleIntelligenceApiController::class, 'budgetScenariosIndex'])
+        ->middleware('throttle:60,1');
+    Route::post('/websites/{website}/budget-scenarios', [ModuleIntelligenceApiController::class, 'budgetScenariosStore'])
+        ->middleware('throttle:20,1');
 
     Route::get('/analysis-jobs/{analysis_job}', [AnalysisJobApiController::class, 'show'])
         ->middleware('throttle:60,1');

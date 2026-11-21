@@ -22,7 +22,7 @@ Browser
 2. User creates a project; project ownership is enforced by `App\Policies\ProjectPolicy`.
 3. User adds a website URL to a project. `App\Services\Security\UrlValidator` validates syntax, scheme, host and rejects local/private/metadata hosts at submission time; `App\Support\UrlNormalizer` produces a canonical URL whose SHA-256 hash acts as the unique key per project.
 4. User (or API client) requests analysis: `App\Services\Analysis\AnalysisJobService` enforces duplicate protection (one active job per website) and creates a job in `pending` state with a UUID identifier.
-5. From Phase 2, dispatch to GitHub Actions and callback persistence extend this flow. Jobs are never marked completed without crawler results.
+5. From Phase 2, dispatch to GitHub Actions and callback persistence extend this flow; from Phases 3-4 the analysis pipeline computes scores and module results from the persisted crawl evidence. Jobs are never marked completed without crawler results.
 
 ## Key components
 
@@ -34,7 +34,7 @@ Browser
 | `App\Models\AuditLog` | security-relevant event logging |
 | Policies (`ProjectPolicy`, `WebsitePolicy`, `AnalysisJobPolicy`) | ownership authorization for every action |
 
-Planned services (Phase 2+): `WebsiteCrawlService`, `PageExtractionService`, `TechnicalAuditService`, `MarketingAnalysisService`, `CampaignScoringService`, `ConversionOpportunityService`, `BudgetCalculationService`, `WastedSpendAnalysisService`, `LeadReadinessService`, `CreativeAnalysisService`, `MarketingAdvisorService`, `ReportGenerationService`, `CrawlerDispatcherService`, `CrawlerCallbackService`.
+Planned services (Phase 5+): `MarketingAdvisorService` (rule-based fallback + optional external AI provider), `ReportGenerationService` (Phase 6 PDF/CSV).
 
 ## Data integrity principles
 
@@ -74,3 +74,26 @@ Phase 3 additions: `CrawlerCallbackService` now invokes `AnalysisPipeline.run(jo
 Alternative execution without any cloud: `php artisan analysis:run-local --all --engine=http` runs the same Node crawler locally and feeds results through the callback service directly (no HTTP hop), and `php artisan analysis:prune-stale` reaps timed-out pending/dispatched jobs.
 
 Crawler package layout: `crawler/bin/crawl.js` (CLI + signing/POST), `crawler/src/ssrf.js` (IP/hostname policy + DNS validation), `crawler/src/request.js` (pinned-lookup transport + guarded redirect chain), `crawler/src/discovery.js` (robots.txt + sitemap), `crawler/src/extract.js` (marketing feature extraction), `crawler/src/engine-http.js` + `crawler/src/engine-playwright.js` (same JSON contract for both engines), `crawler/test/` (node:test suite).
+
+## Intelligence pipeline (Phases 3-4, implemented)
+
+`AnalysisPipeline.run(job)` executes inside the crawl-persistence transaction and runs six modules against the same stored evidence (one crawl per analysis; no per-module crawling):
+
+```
+CrawlerCallbackService->handleCompleted
+    -> persist crawled pages + crawl errors
+    -> AnalysisPipeline.run(job)   (errors caught + audited; crawl status never falsified)
+        -> TechnicalAuditService      -> technical_audits (upsert)
+        -> CampaignReadinessService   -> marketing_scores[module=campaign_readiness] (upsert)
+                                      -> campaign_insights (delete + insert)
+        -> ConversionOpportunityService -> marketing_scores[module=conversion_opportunity]
+                                        -> predictive_insights (delete + insert)
+        -> LeadReadinessService       -> marketing_scores[module=lead_intelligence]
+                                      -> lead_insights (delete + insert)
+        -> WastedSpendAnalysisService -> waste_findings (delete + insert)
+        -> CreativeAnalysisService    -> creative_insights (delete + insert)
+```
+
+All scores are stored in the shared `marketing_scores` table keyed by `(analysis_job_id, module_key)` with methodology version, breakdown JSON and confidence. `BudgetCalculationService` is on-demand only (no cron/pipeline work): users submit budget assumptions through the API or the Budget screen and results are persisted to `budget_scenarios` as clearly-labelled deterministic simulations. Module 7 (AI Marketing Advisor) is Phase 5.
+
+Module results are exposed through `GET /api/websites/{id}/{predictive-analytics|lead-intelligence|wasted-spend|creative-intelligence}` plus the Phase 3 `campaign-intelligence` endpoint, and through five UI screens reached via module tabs on the website page (`resources/views/websites/modules/`, tabs partial in `resources/views/websites/partials/`). Screens without a completed analysis show an honest empty state; persisted rows are ordered by priority/severity.

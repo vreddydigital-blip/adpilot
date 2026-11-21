@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\BudgetScenario;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -48,5 +49,10 @@ class Website extends Model
     public function latestAnalysisJob(): HasOne
     {
         return $this->hasOne(AnalysisJob::class)->latestOfMany();
+    }
+
+    public function budgetScenarios(): HasMany
+    {
+        return $this->hasMany(BudgetScenario::class);
     }
 }

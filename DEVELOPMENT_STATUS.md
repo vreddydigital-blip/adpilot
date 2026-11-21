@@ -1,10 +1,10 @@
 # DEVELOPMENT_STATUS
 
-Last updated: Phase 3 completion.
+Last updated: Phase 4 completion.
 
 ## Current phase
 
-**PHASE 3 - TECHNICAL AND MARKETING ANALYSIS (complete).** Phases 4-8 not started.
+**PHASE 4 - ALL SEVEN MODULES BACKEND + MODULE 2-6 (complete; Module 7 AI Marketing Advisor is Phase 5 by design).** Phases 5-8 not started.
 
 Deployment target decision: **Render (free web service) + TiDB Cloud Starter + GitHub Actions crawler** is the Phase 8 target (user-approved). Hostless remains documented as a fallback.
 
@@ -47,20 +47,32 @@ Deployment target decision: **Render (free web service) + TiDB Cloud Starter + G
 - UI: website page now renders the real Campaign Readiness Score with per-criterion breakdown and evidence, the technical audit check list (pass/warn/fail/unknown), and prioritised findings & recommendations
 - Methodology honesty: all scores labelled heuristic, URL-only evidence, "not a validated ML prediction"
 
+### Phase 4 - Modules 2-6 (backend + API + UI)
+- Pipeline extended: after every completed crawl the `AnalysisPipeline` now also runs the four new intelligence services inside its transaction: ConversionOpportunityService (Module 2), LeadReadinessService (Module 5), WastedSpendAnalysisService (Module 4) and CreativeAnalysisService (Module 6); all persist idempotently (scores update in place; insight/finding/creative rows are replaced per job) and the whole block is re-runnable via `php artisan analysis:reprocess` (verified live: two consecutive runs produce identical scores and row counts)
+- Module 2 Predictive Analytics: 10 opportunities (CTA placement, form complexity, content clarity, value proposition, navigation, landing relevance, mobile usability, trust signals, contact accessibility, page performance) scored `severity x impact x confidence / 25 x 100`, priority thresholds 50/25, unknown evidence excluded from the aggregate; stored in `predictive_insights` + `marketing_scores` (`conversion_opportunity`)
+- Module 3 Budget Intelligence: `BudgetCalculationService` with the exact master-prompt formulas (clicks = budget/CPC, leads, conversions, CPL/CPA, break-even ROAS = 1/markup margin, revenue, profit), three scenario cases (conservative/expected/best factor table) and three channel assumption sets (search/social/display); interactive calculator UI with validation; scenarios persisted per user+website in `budget_scenarios` with methodology `deterministic simulation` + disclaimer everywhere
+- Module 4 Wasted Spend: findings derived only from already-computed Phase 3 results (technical check failures/degradations + low campaign criteria with severity escalation), stored in `waste_findings` with potential impact + correction; explicit disclaimer that actual wasted spend requires ad-cost/conversion integrations
+- Module 5 Lead Intelligence: parses the crawler's form evidence ("N-field get|post form") into structured form data, scores form/lead-contact presence (cap 95), stores insights (no forms, form friction > 4 fields, missing contact channels, homepage CTA consistency, contact page) in `lead_insights` + `marketing_scores` (`lead_intelligence`)
+- Module 6 Ad Creative Intelligence: Google Search headlines (30 chars), Google descriptions (90), Meta headlines (40), Meta primary text (125) generated deterministically from the site's own titles/headings/descriptions/CTA labels with word-boundary fitting; messaging angles from detected offer words; token-overlap message-match verdict explicitly labelled as not predicting CTR; stored in `creative_insights`
+- Schema tables (migrated): `predictive_insights`, `waste_findings`, `lead_insights`, `creative_insights`, `budget_scenarios`
+- API: `GET /api/websites/{id}/predictive-analytics`, `/lead-intelligence`, `/wasted-spend`, `/creative-intelligence` (ownership-enforced, honest `data: null` without a completed job), `GET /api/websites/{id}/budget-intelligence` + `/budget-scenarios` (saved scenarios), `POST /api/websites/{id}/budget-scenarios` (validated inputs -> simulation -> persisted scenario, channel factors applied), `GET /api/budget-channels`
+- UI: module tab navigation on every website page; five working per-website screens (Predictive Analytics, Budget Intelligence with save/delete scenario forms, Wasted Spend, Lead Intelligence, Ad Creative) with empty states; website overview placeholder note updated (AI advisor coming in Phase 5)
+- Tests: 49 new tests over the five services, pipeline persistence, module APIs and module pages (192 total for the Laravel app)
+
 ## Incomplete features (planned phases - never faked in UI)
 
 - `performance_audits` table deferred until a Lighthouse/PageSpeed or similar data source is available (Phase 2 crawl timing is used as a relative indicator inside the technical audit in the meantime)
-- Phase 4: seven intelligence modules with UI screens + budget calculators (Module 1 scoring exists; the remaining 6 modules and their screens come in Phase 4)
-- Phase 5: AI Marketing Advisor (rule-based + optional external AI)
-- Phase 6: charts, historical comparison, PDF/CSV reports
+- Module 7 AI Marketing Advisor + `recommendations` table and its screen: Phase 5 (rule-based fallback + optional external AI interface)
+- Phase 6: charts (Chart.js), historical comparison, PDF/CSV reports
 - Phase 7: security/QA audit, crawler stress tests
 - Phase 8: free hosting deployment (Render + TiDB + GitHub Actions)
 
 ## Tests executed
 
-- Laravel: `php artisan test` - **143 passed, 0 failed** (460 assertions), SQLite in-memory, PHP 8.3.22, Laravel 12 (Unit: 74/241, Feature: 69/219)
+- Laravel: `php artisan test` - **192 passed, 0 failed** (701 assertions), SQLite in-memory, PHP 8.3.22, Laravel 12 (Unit: 101/364, Feature: 91/337)
 - Crawler: `node --test crawler/test/crawler.test.js` - **21 passed, 0 failed**, Node v22.23.5
-- Live Phase 3 reprocessing (executed): `php artisan analysis:reprocess` against the stored books.toscrape.com 20-page crawl produced Campaign Readiness 45/100 and Technical audit 69/100 with 8 insights; spot-checked evidence strings match real crawl data (H1 "All products", no meta description, no viewport meta, no lead forms), confidence high
+- Live Phase 4 reprocessing (executed, twice for idempotency): `php artisan analysis:reprocess` against the stored books.toscrape.com 20-page crawl produced Campaign Readiness 45, Technical audit 69, Conversion opportunity 40, Lead readiness 0 (correct: the store has no forms or contact links), 8 insights, 7 waste findings, 9 creative items; row counts identical across both runs (3 marketing scores, 10 predictive, 7 waste, 9 creative); spot-checked evidence matches real crawl data (H1 "All products", no viewport meta, no lead forms), confidence high
+- Live Phase 3 reprocessing (executed): `php artisan analysis:reprocess` against the same crawl produced Campaign Readiness 45/100 and Technical audit 69/100 with 8 insights; spot-checked evidence strings match real crawl data, confidence high
 - Live end-to-end (executed in this environment): registered a user via real forms over local HTTP, created a project + website, started an analysis through the real job service (dispatch honestly unconfigured -> pending), ran `php artisan analysis:run-local --all`, the crawler fetched books.toscrape.com (20 pages, bounded), the callback service persisted pages/errors/features, job became `completed`, `websites.last_analyzed_at` updated
 - Live SSRF checks (executed): loopback 127.0.0.1, private 10.0.0.1 and link-local 169.254.169.254 -> `blocked_ip`; `metadata.google.internal` and `*.localhost` -> `blocked_hostname`; non-existent host -> structured `dns_failure`
 - Live positive crawls: example.com (1 page), books.toscrape.com (6 pages, depth ordering correct)
@@ -70,7 +82,7 @@ Details in [TESTING.md](TESTING.md).
 
 ## Known bugs
 
-- None open. (Fixed during Phase 2: worker-pool early-exit race in BFS; `WebsiteFactory` ignored explicit `url` overrides; nested-heading arrays crashed callback persistence; fake-host DNS in redirect tests. Fixed during Phase 3: integer division made `$share === 1.0` false for perfect sites, so healthy sites scored "warn" instead of "pass" - shares are now cast to float.)
+- None open. (Fixed during Phase 2: worker-pool early-exit race in BFS; `WebsiteFactory` ignored explicit `url` overrides; nested-heading arrays crashed callback persistence; fake-host DNS in redirect tests. Fixed during Phase 3: integer division made `$share === 1.0` false for perfect sites, so healthy sites scored "warn" instead of "pass" - shares are now cast to float. Fixed during Phase 4: missing `WasteFinding` import in the waste service; skip behavioural quirk - web module view needed `@include` partials, not anonymous component tags.)
 - One transient, non-reproducible failure occurred in a single isolated Feature-suite run during Phase 3 development (test not captured before re-run); 6 subsequent full/isolated runs all pass. Being watched; no code suspect identified yet.
 
 ## Known limitations (honest)

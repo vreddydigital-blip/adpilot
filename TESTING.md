@@ -1,15 +1,15 @@
 # TESTING
 
-Last executed: Phase 3 completion. Suites: `php artisan test` (SQLite in-memory) for the Laravel app and `node --test` for the crawler package.
+Last executed: Phase 4 completion. Suites: `php artisan test` (SQLite in-memory) for the Laravel app and `node --test` for the crawler package.
 
 ## Results
 
 | Suite | Tests | Assertions | Result |
 |---|---|---|---|
-| Laravel Feature | 69 | 219 | all passing |
-| Laravel Unit | 74 | 241 | all passing |
+| Laravel Feature | 91 | 337 | all passing |
+| Laravel Unit | 101 | 364 | all passing |
 | Crawler (node:test) | 21 | 21 node asserts | all passing |
-| **Total** | **164** | **460 assertions + crawler asserts** | **all passed, 0 failed** |
+| **Total** | **212** | **701 assertions + crawler asserts** | **all passed, 0 failed** |
 
 Anomaly log: during Phase 3 development, one isolated Feature-suite run reported 1 failed / 68 passed; the failing test was not captured before re-run and the failure was never reproduced in 6 subsequent full and isolated runs (all pass). Being watched; no code suspect identified.
 
@@ -20,11 +20,12 @@ Breakdown:
 - `tests/Feature/AnalysisJobTest.php` - job creation, duplicate protection, re-analysis after failure, ownership denial, job history in UI.
 - `tests/Feature/ApiTest.php` - Sanctum auth wall, API CRUD, cross-user 403s, website + analysis flow, URL validation over API.
 - `tests/Feature/ProfileTest.php` - profile flows (Breeze).
+- `tests/Feature/ModuleIntelligenceApiTest.php` - Phase 4 module endpoints (see below).
+- `tests/Feature/WebsiteModulePagesTest.php` - Phase 4 module web pages (see below).
 
 ## Coverage gaps (to close in later phases)
 
 - Phase 2: crawler tests (SSRF at DNS/redirect level, timeouts, malformed pages) - crawler belongs to a separate Node.js environment.
-- Phase 4: module algorithm tests (conversion opportunity, budget calculators, lead readiness detail, creative analysis).
 - Phase 6: report/CSV tests. Phase 7: full security audit suite.
 
 ## Test report maintenance
@@ -67,3 +68,21 @@ Laravel (`php artisan test`, all passing):
 - `tests/Feature/CampaignIntelligenceApiTest.php` (4): owner receives persisted readiness/technical/insights JSON (7 criteria, heuristic methodology), cross-user 403, unauthenticated 401, honest `data: null` message when no completed analysis exists.
 
 Bug found by these tests: PHP integer division made `$share === 1.0` false for fully healthy sites (scored "warn" instead of "pass"); shares are now explicit `(float)` casts.
+
+## Phase 4 additions
+
+Laravel (`php artisan test`, all passing; 192 tests / 701 assertions total for the app):
+
+- `tests/Unit/Analysis/BudgetCalculationServiceTest.php` (7): clicks/leads/conversions/CPA math, ROAS + break-even ROAS, target-CPA flag, null CPA/ROAS handling when no conversions occur, three labeled scenario factors (exact expected values: conservative 454.55 clicks, expected 500, best 555.56), disclaimers on every scenario row, channel factors (search 500, social 833.33, display 1250 for budget 1000 / CPC 2).
+- `tests/Unit/Analysis/ConversionOpportunityServiceTest.php` (4): exactly 10 opportunities with fixed key order, reproducible aggregate score 21 for the standard fixture, methodology string states it is not a validated conversion probability, missing-CTA site scores 90 (high) and lands in the high bucket, missing evidence yields all-null scores excluded from the aggregate, high/medium buckets computed.
+- `tests/Unit/Analysis/LeadReadinessServiceTest.php` (5): crawler form-evidence parsing ("2-field post form" -> field_count 2 / method post), score composition (form 40 + short-form 10 + email 10 + entry CTA 10 = 70), unparseable evidence kept as sample only, >4-field forms flag `form_friction` and forfeit the short-form bonus (score 60), 3+ missing contact channels flag `missing_contact_channels` as high, no-page jobs return null score with low confidence.
+- `tests/Unit/Analysis/WastedSpendAnalysisServiceTest.php` (5): failed technical check -> high-severity finding, warn degrades high to medium, unmapped check keys ignored, criterion score < 50 becomes a finding with < 30 escalating to high, healthy criterion ignored, empty result set becomes `no_obvious_leakage` on crawled sites, disclaimer text present.
+- `tests/Unit/Analysis/CreativeAnalysisServiceTest.php` (6): all generated ads respect platform limits (Google 30/90, Meta 40/125), candidates derived from H1/title word fits and CTA labels, word-boundary truncation of long meta descriptions, message match computed as 0-100 int with an explicit no-CTR note, source attribution + disclaimer, empty page set returns empty output.
+- `tests/Feature/AnalysisPipelineTest.php` - extended (7): the three module scores per job (`campaign_readiness`, `conversion_opportunity`, `lead_intelligence`), all four Phase 4 tables populated, re-run replaces (not duplicates) predictive/waste/creative rows.
+- `tests/Feature/ModuleIntelligenceApiTest.php` (12): four module GET endpoints return persisted data for the owner with correct module keys and disclaimers; cross-user 403 on all; 401 unauthenticated (incl. budget-scenarios); honest `data: null` without a completed job; budget scenario POST persists with valid math (3000/1.5 -> 2000 expected-case clicks), channel factor applied (display CPC 2 x 0.4 -> 1250 clicks), validation rejects bad inputs (budget/cpc/lead_rate/gross_margin), cross-user POST forbidden and stores nothing; `budget-channels` lists 3 static factor sets.
+- `tests/Feature/WebsiteModulePagesTest.php` (8): five module pages render persisted results for the owner (scores, insights, findings, headlines), honest "No completed analysis yet" empty state, cross-user 403 on all pages, unauthenticated redirect to login, budget calculator page renders working form + tabs, POST persists and renders the scenario + DELETE removes it, cross-user DELETE 403, website overview shows the module navigation with the honest Phase 5 advisor placeholder.
+
+Live (executed during Phase 4, outside the test runner):
+
+- `analysis:reprocess` on the real books.toscrape.com 20-page crawl: Campaign readiness 45, Technical 69, Conversion opportunity 40, Lead readiness 0 (site has no forms or contact links - correct for a scraped-books sandbox), 8 insights, 7 waste findings, 9 creative items; evidence spot-checked genuine (e.g. mobile_usability high because no viewport tag; `no_forms` because no submit-able form exists on the store).
+- Idempotency re-verified live: a second identical reprocess produced identical scores and identical row counts (3 marketing scores, 10 predictive, 7 waste, 9 creative).

@@ -54,9 +54,54 @@ Phase 1 limitation: jobs are created and retained in `pending`; the crawler disp
 ### GET /api/analysis-jobs/{id}
 Job status lookup, rate-limited to 60 per minute. 403 if not owned.
 
+### GET /api/websites/{id}/predictive-analytics (Phase 4)
+Requires Sanctum auth; ownership enforced via the website policy. Returns the `conversion_opportunity` module for the latest completed job:
+
+```json
+{
+  "website_id": 1,
+  "module": "conversion_opportunity",
+  "analysis_job": { "uuid": "...", "finished_at": "..." },
+  "data": {
+    "score": 40,
+    "version": "v1.0",
+    "breakdown": { "label": "Heuristic Conversion Opportunity Score", "methodology": "...", "opportunities": [ ... ], "high": ["mobile_usability"], "medium": ["form_complexity"], "low": [ ... ] },
+    "opportunities": [ { "opportunity_key": "cta_placement", "priority": "high", "score": 90, "severity": 5, "impact": 5, "confidence": 90, "evidence": ["..."], "recommendation": "...", "effort": "low", "direction": "improvement" } ]
+  }
+}
+```
+
+### GET /api/websites/{id}/lead-intelligence (Phase 4)
+Same shape; `module: "lead_intelligence"`. `data.score` is the heuristic Lead Capture Readiness Score; `data.breakdown` contains the parsed `forms[]`, `contact_methods` map and summary; `data.insights` lists stored lead insights ordered high -> medium -> low.
+
+### GET /api/websites/{id}/wasted-spend (Phase 4)
+Same shape; `module: "wasted_spend"`. `data.findings` are stored waste findings ordered high -> medium -> low by severity, and `data.disclaimer` states that findings are conversion-leakage indicators only, not measured wasted spend.
+
+### GET /api/websites/{id}/creative-intelligence (Phase 4)
+Same shape; `module: "creative_intelligence"`. `data` groups the stored creative rows: `google_headlines`, `google_descriptions`, `meta_headlines`, `meta_primary_text`, `messaging_angles`, plus the `message_match` overlap payload and a no-prediction disclaimer.
+
+For all four endpoints: no completed analysis -> `200` with `data: null` and an honest message. 403 for non-owners; 401 without a token.
+
+### GET /api/budget-channels (Phase 4)
+Requires auth. Returns the static channel assumption factors (search/social/display with cpc_factor and rate_factor) used by budget simulations, plus a planning-only disclaimer.
+
+### GET /api/websites/{id}/budget-scenarios (= /budget-intelligence) (Phase 4)
+Requires auth; ownership enforced. Lists the caller's saved budget scenarios for the website (latest 25): `{ website_id, module: "budget_intelligence", scenarios: [ { id, label, channel, inputs, results, methodology: "deterministic simulation", version, created_at } ] }`.
+
+### POST /api/websites/{id}/budget-scenarios (Phase 4)
+Requires auth; ownership + analyze ability enforced; rate-limited to 20/min. Body (all simulations from user-provided assumptions):
+
+- `budget` required numeric > 0 (max 100000000)
+- `cpc` required numeric > 0 (max 1000)
+- `lead_rate` required numeric 0-100; `conversion_rate` required numeric 0-100
+- `average_order_value` required numeric >= 0; `gross_margin` required numeric > 0 (<= 100)
+- `target_cpa` optional numeric >= 0; `channel` optional `search|social|display` (default `all`); `label` optional max 120
+
+Returns `201` with `{ website_id, scenario_id, label, channel, results: { source_inputs, channel, scenarios[3] }, disclaimer }`. Channel factors are applied to CPC and both rates before scenario factors. Invalid input: `422`. Non-owner: `403`.
+
 ## Planned endpoints (later phases)
 
-`/api/websites/{id}/overview`, `/api/websites/{id}/campaign-intelligence` (implemented - see below), `/api/websites/{id}/predictive-analytics`, `/api/websites/{id}/budget-intelligence`, `/api/websites/{id}/wasted-spend`, `/api/websites/{id}/lead-intelligence`, `/api/websites/{id}/creative-intelligence`, `/api/websites/{id}/marketing-advisor`, `/api/websites/{id}/budget-scenarios`, `/api/reports/{id}`, `/api/internal/crawler-callback`.
+`/api/websites/{id}/overview`, `/api/websites/{id}/marketing-advisor` (Phase 5), `/api/reports/{id}` (Phase 6), `/api/internal/crawler-callback` (implemented - see below).
 
 ### GET /api/websites/{id}/campaign-intelligence (Phase 3)
 

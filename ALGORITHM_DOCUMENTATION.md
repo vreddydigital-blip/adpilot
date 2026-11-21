@@ -63,14 +63,77 @@ Weighted heuristic over criteria derived from crawled evidence (features, headin
 - Technical checks: every fail/warn check with a recommendation becomes an insight (fail -> high, warn -> medium).
 - Each insight stores priority, title, evidence, recommendation, effort (low/medium/high), direction (`improvement`) and confidence.
 
+## Implemented (Phase 4)
+
+### Heuristic Conversion Opportunity Score (ConversionOpportunityService, version v1.0)
+
+Module 2 (Predictive Analytics). Evaluates 10 opportunities across the master-prompt analysis areas, each from crawl evidence only: `cta_placement`, `form_complexity`, `content_clarity`, `value_proposition`, `navigation`, `landing_relevance`, `mobile_usability`, `trust_signals`, `contact_accessibility`, `page_performance`.
+
+Per opportunity, when evidence is known: `raw = severity x impact x (confidence / 100)` with severity and impact on 1-5 scales; `score = round(100 x raw / 25)`; priority: score >= 50 high, >= 25 medium, else low. When evidence is missing, severity/impact/confidence/score are all `null` and priority is `low`; the opportunity is excluded from the aggregate (unknown exclusion, same philosophy as Phase 3).
+
+Aggregate score = `round(100 x sum(raw of known opportunities) / (25 x count(known)))`. All opportunities unknown -> score null. Label: "Heuristic Conversion Opportunity Score"; methodology string explicitly states it is not a validated conversion probability. Each opportunity stores evidence, recommendation, effort (low/medium/high), direction (`improvement`) and its own score.
+
+Persistence: `marketing_scores` row (module `conversion_opportunity`, breakdown contains label, methodology, full opportunity list and high/medium/low key buckets) + one `predictive_insights` row per opportunity (the internal `raw` intermediate is stripped before persisting).
+
+### Lead Capture Readiness Score (LeadReadinessService, version v1.0)
+
+Module 5 (Lead Intelligence). Additive presence heuristic over crawl evidence: lead form detected 40, short form (<= 3 fields) +10, email link 10, phone link 10, WhatsApp link 5, booking link 15, CTA on entry page +10; capped at 95 (URL-only evidence cannot prove quality).
+
+Forms are parsed from the crawler's compact evidence strings ("N-field get|post form") into `{field_count, method, sample}`; unparseable strings are kept as sample-only with null structure. No pages -> score null, confidence low, honest summary.
+
+Insights (stored in `lead_insights`): `no_forms` (high), `form_friction` (medium, when any form has > 4 fields), `missing_contact_channels` (high when 3+ of email/phone/WhatsApp/booking missing, else medium), `homepage_cta_consistency` (medium), `contact_page` (medium, no URL/title matching contact/about patterns within the 20-page cap). Confidence medium when a score exists, low otherwise.
+
+### Wasted spend findings (WastedSpendAnalysisService, version v1.0)
+
+Module 4. Produces no score - it derives findings purely from already-computed Phase 3 results, never fabricates monetary values. From technical checks: fail -> severity high, warn degrades high to medium; mapped checks: https, status_codes, titles, meta_descriptions, mobile_viewport, load_time, content, crawl_errors (each with evidence, potential marketing impact, recommended correction). From campaign criteria: score < 50 becomes a finding (initial severity from map over cta_effectiveness, lead_capture_readiness, offer_clarity, trust_signals, mobile_usability), escalated to high when criterion score < 30. Zero findings with pages -> a low `no_obvious_leakage` finding. Disclaimer stored with the module: findings are conversion-leakage indicators only; actual wasted spend requires advertising cost + conversion data (integrations, future phase).
+
+### Creative generation (CreativeAnalysisService, version v1.0)
+
+Module 6. Deterministic templates assembled from the website's own titles, headings, meta descriptions and CTA labels. No page content is invented.
+
+| Output | Source | Character limit | Notes |
+|---|---|---:|---|
+| Google Search headlines | H1/title word-boundary fits (6-word subset when >= 12 chars), brand, brand + offer hook when it fits, first CTA label; skip raw text equal to brand but still fit its word subset | 30 | 5-30 chars kept, case-insensitive dedupe, max 8 |
+| Google Search descriptions | meta description verbatim (fitted), else H1/title + " Learn more at {brand}." | 90 | >= 30 chars kept, max 4 |
+| Meta primary text | meta description or H1 (+ brand) | 125 | >= 20 chars kept, max 3 |
+| Meta headlines | brand, H1, title, brand + offer hook | 40 | >= 5 chars kept, max 5 |
+| Messaging angles | offer-word detection (free/trial/demo/quote, price/plan, book/buy/cart/checkout) | - | risk-reversal / transparency / direct-response conditionally + problem-solution always |
+| Message match | token overlap: tokens >= 3 chars; per headline, share of tokens that appear in page text (page token starting with the ad token counts); average x 100 | - | verdict: good >= 60%, partial >= 30%, else low; explicit note that this does NOT predict CTR or conversions |
+
+`fit()` truncates at the last word boundary. No crawled pages -> empty output. Persistence: `creative_insights` rows with kind `google_headline`, `google_description`, `meta_headline`, `meta_primary_text`, `messaging_angle` and one `message_match` row carrying the verdict payload.
+
+### Budget simulation (BudgetCalculationService, version v1.0)
+
+Module 3. Pure user-assumption math (never crawl-derived, never presented as real performance):
+
+- `clicks = budget / cpc` (cpc > 0, else 0); `leads = clicks x lead_rate / 100`; `conversions = leads x conversion_rate / 100`; `cpa = conversions > 0 ? budget / conversions : null`; `revenue = conversions x aov`; `roas = budget > 0 ? revenue / budget : null`; `break_even_roas = margin > 0 ? 1 / margin : null`; `profit = revenue - budget`; `meets_target_cpa` = cpa <= target (null when no CPA possible or no target); `meets_break_even_roas` = roas >= break-even.
+
+Scenario factors (applied to assumptions, all rounded to 2 dp):
+
+| Scenario | CPC factor | Rate factor |
+|---|---:|---:|
+| Conservative case | 1.1 | 0.7 |
+| Expected case | 1.0 | 1.0 |
+| Best case | 0.9 | 1.3 |
+
+| Channel | CPC factor | Rate factor |
+|---|---:|---:|
+| Search ads | 1.0 | 1.0 |
+| Social ads | 0.6 | 0.8 |
+| Display ads | 0.4 | 0.6 |
+
+Every result row carries the disclaimer: "Deterministic simulation from your stated assumptions - not actual campaign performance." Scenarios are persisted in `budget_scenarios` (inputs, results, methodology `deterministic simulation`, version) linked to the website and creating user; channel-specific requests apply the channel factor to CPC and both rates before scenario factors.
+
 ### Pipeline invocation and idempotency
 
-`AnalysisPipeline::run(job)`: refuses jobs with no crawled pages; otherwise persists `technical_audits` (unique per job) and `marketing_scores` (unique per job+module, updated in place) and replaces the job's `campaign_insights`, so re-running `analysis:reprocess` never duplicates rows. A pipeline exception is caught, audited (`analysis_pipeline.failed`) and never marks the crawl failed - crawl results are already persisted and remain usable.
+`AnalysisPipeline::run(job)`: refuses jobs with no crawled pages; otherwise, inside one database transaction, persists `technical_audits` (unique per job) and `marketing_scores` for `campaign_readiness`, `conversion_opportunity` and `lead_intelligence` (unique per job+module, updated in place) and replaces the job's `campaign_insights`, `predictive_insights`, `lead_insights`, `waste_findings` and `creative_insights` rows (delete-then-insert), so re-running `analysis:reprocess` never duplicates rows (verified live: two consecutive reprocesses on a 20-page crawl produced identical scores and identical row counts). A pipeline exception is caught, audited (`analysis_pipeline.failed`) and never marks the crawl failed - crawl results are already persisted and remain usable.
 
 ## Planned algorithms (documented in later phases)
 
-- Phase 3: Heuristic Conversion Opportunity Score = severity x impact x confidence, normalized 0-100, explicitly labelled heuristic. (Planned for Phase 4 - Predictive Analytics module.)
-- Phase 4: budget scenario formulas (estimated clicks = budget / CPC, leads = clicks x assumed lead rate, CPA = budget / conversions, revenue = conversions x AOV, break-even ROAS = 1 / gross margin) - clearly labelled simulations, never real performance.
+- Phase 5: AI Marketing Advisor - evidence-based prioritised recommendations with a deterministic rule-based fallback engine (no external AI provider required for core functionality).
+- Later phases: historical comparison and report generation over persisted module results; performance_audits once Lighthouse/PageSpeed data is available; future ML only when labelled conversion data exists.
+
+## Fabrication policy
 
 ## Fabrication policy
 
