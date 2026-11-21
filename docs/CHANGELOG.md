@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## Phase 4.1 - Documentation reorganisation
+
+- All 11 required documentation files moved from the repository root into `docs/` (git history preserved); no content changed and doc-to-doc links remain valid
+
 ## Phase 1 - Foundation (2026-11-21)
 
 Added:
