@@ -1,0 +1,57 @@
+name: Crawler
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: "AdPilot analysis job UUID"
+        required: true
+        type: string
+      target_url:
+        description: "Website to crawl"
+        required: true
+        type: string
+      callback_url:
+        description: "Laravel callback endpoint"
+        required: true
+        type: string
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: crawler/package-lock.json
+
+      - name: Install crawler dependencies
+        working-directory: crawler
+        run: npm ci --no-audit --no-fund
+
+      - name: Install Playwright with Chromium
+        working-directory: crawler
+        run: |
+          npm install --no-save playwright@1.49.1 --no-audit --no-fund
+          npx playwright install chromium --with-deps
+
+      - name: Run bounded crawl and report to the callback API
+        working-directory: crawler
+        env:
+          CRAWLER_CALLBACK_SECRET: ${{ secrets.CRAWLER_CALLBACK_SECRET }}
+        run: |
+          node bin/crawl.js \
+            --url "${{ inputs.target_url }}" \
+            --job-id "${{ inputs.job_id }}" \
+            --engine playwright \
+            --max-pages 20 \
+            --max-duration-ms 300000 \
+            --page-timeout-ms 25000 \
+            --callback-url "${{ inputs.callback_url }}"

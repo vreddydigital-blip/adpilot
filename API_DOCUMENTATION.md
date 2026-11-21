@@ -59,3 +59,30 @@ Job status lookup, rate-limited to 60 per minute. 403 if not owned.
 `/api/websites/{id}/overview`, `/api/websites/{id}/campaign-intelligence`, `/api/websites/{id}/predictive-analytics`, `/api/websites/{id}/budget-intelligence`, `/api/websites/{id}/wasted-spend`, `/api/websites/{id}/lead-intelligence`, `/api/websites/{id}/creative-intelligence`, `/api/websites/{id}/marketing-advisor`, `/api/websites/{id}/budget-scenarios`, `/api/reports/{id}`, `/api/internal/crawler-callback`.
 
 The internal crawler callback will use a shared-secret HMAC signature, timestamp-based replay protection, and strict job ownership checks (Phase 2).
+
+## Internal endpoint (Phase 2) - crawler callback
+
+### POST /api/internal/crawler-callback
+
+Called by the crawler runner (GitHub Actions workflow or `analysis:run-local`) after a crawl.
+
+- **Authentication:** HMAC-SHA256 signature over `"{timestamp}.{rawBody}"` using the shared `CRAWLER_CALLBACK_SECRET` (runner-side secret). Headers: `X-AdPilot-Timestamp` (unix seconds; +/- 300 s tolerance) and `X-AdPilot-Signature` (64 hex chars). A nonce cache rejects replays inside the window. Not behind `auth:sanctum`.
+- **Request:** JSON body `{ job_id, status, ... }` where `status` is `started`, `progress`, `completed` or `failed`.
+    - For `completed`: `summary.duration_ms`, `pages[]` (max 20; each with `url`, optional `final_url`, `http_status`, `title`, `meta`, `headings`, `text_length`, `load_time_ms`, `depth`, `features[]`), optional `errors[]` (`error_type`, `message`, optional `url`). Every page host must match the analysed website host.
+    - For `failed`: optional `failure_reason` (max 120) and `error_message` (max 2000).
+- **Responses:**
+    - `401` `{ message }` - missing/invalid signature headers, expired timestamp, forged signature, or replayed request (audited as `crawler_callback.rejected`).
+    - `404` `{ message: "Unknown analysis job." }` - `job_id` not found.
+    - `422` `{ message }` - non-JSON body, missing `job_id`, unknown `status`, payload validation failure, or a page outside the analysed website (`host_mismatch`).
+    - `409` `{ outcome: "job_already_terminal" }` - job already completed/failed/cancelled (idempotency guard).
+    - `200` `{ outcome, message }` - recorded. `outcome` is `progress_recorded`, `completed` or `failed_recorded`.
+
+### Dispatch behavior (analysis endpoints)
+
+`POST /api/websites/{id}/analyze` (API) and the web "Start Analysis" button create the job and then attempt a GitHub Actions `workflow_dispatch` through the repository dispatches endpoint (`api.github.com/repos/{repo}/actions/workflows/{workflow}/dispatches`). The API response includes `dispatch`:
+
+- `{ dispatched: true }` - job moved to `dispatched`.
+- `{ dispatched: false, reason: "dispatcher_not_configured" }` - credentials unset; job stays `pending` (use the local `analysis:run-local` mode).
+- `{ dispatched: false, reason: "dispatch_request_failed" }` - GitHub unreachable or rejected; job stays `pending`.
+
+A job is never marked completed without a validated crawler callback.

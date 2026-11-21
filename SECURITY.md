@@ -25,3 +25,11 @@ Sessions: database driver locally (provider-agnostic); cookie flags `secure`/`ht
 ## Reporting
 
 Report suspected security issues in this portfolio project by opening a private advisory in the repository.
+
+## Crawler callback authentication (Phase 2)
+
+- `POST /api/internal/crawler-callback` verifies `hash_hmac('sha256', '<timestamp>.<rawBody>', CRAWLER_CALLBACK_SECRET)` using `hash_equals`, with an absolute timestamp tolerance of 300 seconds and a nonce cache (`Cache::add`, TTL twice the tolerance) so one body+signature pair can only be processed once. Rejections are audited (`crawler_callback.rejected`) with IP and user agent; no job data is returned on failure.
+- The endpoint performs its own authorization: jobs are looked up by UUID and payloads are rejected if any page URL points outside the analysed website's host. A maximum of 20 pages is accepted with a strict validator bounding every field length.
+- Terminal-state guard: callbacks for completed/failed/cancelled jobs return 409 and mutate nothing.
+- Secret management: `CRAWLER_CALLBACK_SECRET` exists only as a server-side environment variable and as a GitHub Actions repository secret runner-side. It is separate from the `GITHUB_TOKEN`, which never leaves the dispatcher and is never forwarded into crawler logs.
+- The dispatch uses the repository `workflow_dispatch` API with a fixed input allow-list (`job_id`, `target_url`, `callback_url`); the crawl runs only in the private repository.

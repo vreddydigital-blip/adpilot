@@ -64,11 +64,64 @@ Indexes: `(website_id, created_at)`, `(user_id, status)`.
 | properties | json | nullable |
 | created_at | timestamp | index via (user_id, created_at) |
 
-Currently recorded actions: `project.created`, `project.updated`, `project.deleted`, `website.created`, `website.deleted`, `analysis_job.created`.
+Currently recorded actions: `project.created`, `project.updated`, `project.deleted`, `website.created`, `website.deleted`, `analysis_job.created`, `analysis_job.dispatched`, `crawler_callback.completed`, `crawler_callback.failed`, `crawler_callback.rejected`, `crawler_callback.host_mismatch`, `analysis_job.stale_timeout`, `analysis_job.local_runner_failure`.
+
+## Crawler tables (created in Phase 2)
+
+### crawled_pages
+
+| Column | Type | Notes |
+|---|---|---|
+| analysis_job_id | FK -> analysis_jobs, cascade | index (analysis_job_id, created_at) |
+| url | varchar(2048) | requested URL |
+| final_url | varchar(2048) | nullable; after redirects |
+| http_status | smallint unsigned | nullable |
+| title | varchar(512) | nullable |
+| meta | json | description/keywords/OpenGraph (stringified, max 25) |
+| headings | json | `{h1: [], h2: [], h3: []}` (max 30 each) |
+| text_length | int unsigned | nullable |
+| load_time_ms | int unsigned | nullable |
+| content_hash | varchar(64), index | sha256 of final URL (deduplication key for later phases) |
+| features | json | `{feature_key, present, count, evidence[]}` summary array |
+| depth | int unsigned | BFS depth, 0 = start page |
+
+### page_snapshots
+
+| Column | Type | Notes |
+|---|---|---|
+| analysis_job_id | FK -> analysis_jobs, cascade | |
+| crawled_page_id | FK -> crawled_pages, cascade | unique (crawled_page_id, device) |
+| device | varchar(20) | `desktop` or `mobile` |
+| storage_path | varchar(512) | path/blob reference - screenshots are never stored inside the database |
+| size_bytes | int unsigned | |
+| captured_at | timestamp | |
+
+Populated from Phase 3 onward (optional Playwright screenshots; stays empty when the http engine runs).
+
+### page_features
+
+| Column | Type | Notes |
+|---|---|---|
+| crawled_page_id | FK -> crawled_pages, cascade | unique (crawled_page_id, feature_key) |
+| feature_key | varchar(100) | e.g. `cta_buttons`, `lead_forms`, `email_links`, `trust_signals` |
+| present | boolean | |
+| count | int | |
+| evidence | json | capped evidence strings |
+
+The per-page `features` JSON on `crawled_pages` is already populated; these normalized rows will be written when the Phase 3 inference services run.
+
+### crawl_errors
+
+| Column | Type | Notes |
+|---|---|---|
+| analysis_job_id | FK -> analysis_jobs, cascade | |
+| url | varchar(2048) | nullable |
+| error_type | varchar(60) | e.g. `dns_failure`, `blocked_ip`, `http_404`, `timeout` |
+| message | varchar(1000) | truncated |
+| occurred_at | timestamp | |
 
 ## Planned tables (created in later phases)
 
-crawler: `crawled_pages`, `page_snapshots`, `page_features`, `crawl_errors`
 technical: `technical_audits`, `performance_audits`
 intelligence: `marketing_scores`, `campaign_insights`, `predictive_insights`, `budget_scenarios`, `waste_findings`, `lead_insights`, `creative_insights`, `recommendations`
 reporting/admin: `reports`, `integration_settings`

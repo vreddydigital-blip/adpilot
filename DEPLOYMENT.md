@@ -15,7 +15,7 @@
 
 | Component | Provider | Card required | Status |
 |---|---|---|---|
-| Laravel app | Hostless (hostless.cloud) | Verify at sign-up | planned Phase 8 |
+| Laravel app | Render - free web service | 750 free instance-hrs/month; verify at sign-up | planned Phase 8 |
 | Database | TiDB Cloud Starter (tidbcloud.com) | Verify at sign-up | planned Phase 8 |
 | Crawler | GitHub Actions (workflow_dispatch) | No | planned Phase 2/8 |
 
@@ -55,3 +55,21 @@ Sign-up requirements and free quotas must be verified against the providers' cur
 ## Production-readiness statement
 
 The no-card free deployment is a portfolio demonstration. It is NOT production-ready (no managed backups, no SLA, shared free-tier capacity). A production-readiness review (uptime, backups, disaster recovery, capacity, isolation, monitoring) is required before accepting business-critical workloads.
+
+## Phase 8 deployment target (updated: Render)
+
+The primary Phase 8 target is **Render + TiDB Cloud Starter + GitHub Actions** (user decision; Hostless remains documented as a fallback because its free allowance must be re-verified at sign-up).
+
+### Application (Render - free web service)
+
+- Deploy the Laravel monolith with a Dockerfile (PHP 8.3 + nginx, or `php artisan serve` behind Render's router) built from the GitHub repository.
+- Free web service: 0.1 CPU / 512 MB RAM, sleeps after ~15 minutes idle (first request wakes it, about a minute), 750 instance-hours/month, 100 GB/month outbound bandwidth. Ephemeral filesystem - all durable data lives in TiDB.
+- Required environment: `APP_KEY`, `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL`, `DB_*` (TiDB + `MYSQL_ATTR_SSL_CA`), `SESSION_DRIVER=database`, `CACHE_STORE=database` (free instances have no shared disk or Redis), `CRAWLER_CALLBACK_BASE_URL`, `CRAWLER_CALLBACK_SECRET`.
+- Use Laravel's default `/up` route as the Render health check path.
+- Run migrations in the build/start command (`php artisan migrate --force`); credentials come only from the environment.
+
+### Crawler (GitHub Actions - unchanged)
+
+- `.github/workflows/crawler.yml` is triggered by the app's dispatcher via the repository dispatches endpoint using a fine-grained PAT limited to `actions:write` on the private repository.
+- Repository secret used by the workflow: `CRAWLER_CALLBACK_SECRET`. The token lives only in the app environment.
+- Free minutes: private repositories get 2,000 Actions minutes/month on the Free plan; a bounded crawl (under 5 minutes, 20 pages) uses only a small slice.

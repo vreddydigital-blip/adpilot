@@ -28,4 +28,20 @@ class WebsiteFactory extends Factory
             'last_analyzed_at' => null,
         ];
     }
+
+    public function forUrl(string $url): static
+    {
+        return $this->state(function () use ($url) {
+            $result = app(UrlValidator::class)->validate($url);
+
+            assert($result['valid'] === true);
+
+            return [
+                'url' => $url,
+                'normalized_url' => $result['normalized_url'],
+                'url_hash' => $result['url_hash'],
+                'host' => $result['host'],
+            ];
+        });
+    }
 }

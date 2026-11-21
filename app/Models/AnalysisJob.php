@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AnalysisJob extends Model
 {
@@ -59,6 +60,21 @@ class AnalysisJob extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function crawledPages(): HasMany
+    {
+        return $this->hasMany(CrawledPage::class);
+    }
+
+    public function crawlErrors(): HasMany
+    {
+        return $this->hasMany(CrawlError::class);
+    }
+
+    public function pageSnapshots(): HasMany
+    {
+        return $this->hasMany(PageSnapshot::class);
     }
 
     public function isActive(): bool

@@ -46,6 +46,29 @@ Planned services (Phase 2+): `WebsiteCrawlService`, `PageExtractionService`, `Te
 
 ## Deployment topology (free hosting, Phase 8)
 
-- Laravel app: Hostless (Dockerfile deployment, ephemeral filesystem - no permanent files stored locally)
+- Laravel app: Render free web service (Dockerfile deployment, ephemeral filesystem - no permanent files stored locally); Hostless documented as fallback
 - Database: TiDB Cloud Starter (MySQL-compatible, TLS, zero spending limit)
 - Crawler: GitHub Actions workflow_dispatch jobs, authenticated and bounded
+
+## Phase 2 - crawler pipeline (implemented)
+
+```
+analyze (web UI or API)
+    -> AnalysisJobService.startAnalysis    (pending job, duplicate protection, audit)
+    -> GitHubActionsDispatcher.dispatch    (workflow_dispatch; or honestly stays pending)
+    -> crawler workflow (.github/workflows/crawler.yml, private repository)
+        -> node crawler/bin/crawl.js --engine playwright
+            SSRF guards: hostname/IP allow-list per hop, pinned validated DNS answer for connect,
+            redirect revalidation, response-size cap, timeouts
+            limits: 20 pages, 5 MB/page, crawl deadline, 1 retry, concurrency <= 5
+            extraction: title/meta/headings/CTAs/forms/contacts/trust signals/links
+        -> HMAC-signed POST /api/internal/crawler-callback (secret = CRAWLER_CALLBACK_SECRET)
+    -> CallbackVerifier (HMAC + timestamp window + nonce) -> CrawlerCallbackService
+        -> validation (20-page cap, host match, field limits), terminal-state guard (409)
+        -> persist crawled_pages + crawl_errors, job moved to completed, websites.last_analyzed_at
+    -> (Phase 3+) intelligence services consume the same stored crawl evidence
+```
+
+Alternative execution without any cloud: `php artisan analysis:run-local --all --engine=http` runs the same Node crawler locally and feeds results through the callback service directly (no HTTP hop), and `php artisan analysis:prune-stale` reaps timed-out pending/dispatched jobs.
+
+Crawler package layout: `crawler/bin/crawl.js` (CLI + signing/POST), `crawler/src/ssrf.js` (IP/hostname policy + DNS validation), `crawler/src/request.js` (pinned-lookup transport + guarded redirect chain), `crawler/src/discovery.js` (robots.txt + sitemap), `crawler/src/extract.js` (marketing feature extraction), `crawler/src/engine-http.js` + `crawler/src/engine-playwright.js` (same JSON contract for both engines), `crawler/test/` (node:test suite).

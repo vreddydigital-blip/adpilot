@@ -24,3 +24,6 @@ Homestead.yaml
 Thumbs.db
 .htmllint
 /composer.phar
+
+# Crawler dependencies
+crawler/node_modules/

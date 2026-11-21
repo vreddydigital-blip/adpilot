@@ -88,12 +88,16 @@ class WebsiteController extends Controller
     {
         $this->authorize('analyze', $website);
 
-        [$job, $created] = array_values($this->analysisJobService->startAnalysis($website, $request->user(), $request));
+        [$job, $created, $dispatch] = array_values($this->analysisJobService->startAnalysis($website, $request->user(), $request));
 
         if (! $created) {
             return back()->with('status', 'An analysis is already running for this website.');
         }
 
-        return back()->with('status', 'Analysis job created and queued. The crawler runner (Phase 2) will pick it up.');
+        $message = $dispatch['dispatched']
+            ? 'Analysis dispatched to the crawler runner.'
+            : 'Analysis job created. No crawler runner is configured, so the job stays pending until a runner picks it up (use analysis:run-local locally).';
+
+        return back()->with('status', $message);
     }
 }

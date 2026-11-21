@@ -1,0 +1,18 @@
+{
+  "name": "adpilot-crawler",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SSRF-hardened website crawler for AdPilot AI analysis jobs",
+  "type": "commonjs",
+  "main": "bin/crawl.js",
+  "scripts": {
+    "start": "node bin/crawl.js --help",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

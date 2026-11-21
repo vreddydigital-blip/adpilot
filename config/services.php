@@ -35,4 +35,14 @@ return [
         ],
     ],
 
+    'crawler' => [
+        'callback_secret' => env('CRAWLER_CALLBACK_SECRET', ''),
+        'github_token' => env('GITHUB_TOKEN', ''),
+        'github_repo' => env('GITHUB_REPO', ''),
+        'workflow' => env('CRAWLER_WORKFLOW', 'crawler.yml'),
+        'callback_base_url' => env('CRAWLER_CALLBACK_BASE_URL', ''),
+        'stale_timeout_minutes' => env('CRAWLER_STALE_TIMEOUT_MINUTES', 30),
+        'local_runner_path' => env('CRAWLER_LOCAL_RUNNER_PATH', 'crawler'),
+    ],
+
 ];

@@ -4,6 +4,7 @@ namespace App\Services\Analysis;
 
 use App\Models\AnalysisJob;
 use App\Models\AuditLog;
+use App\Services\Crawler\GitHubActionsDispatcher;
 use App\Models\User;
 use App\Models\Website;
 use Illuminate\Http\Request;
@@ -42,9 +43,12 @@ class AnalysisJobService
             $request->userAgent(),
         );
 
+        $dispatch = app(GitHubActionsDispatcher::class)->dispatch($job);
+
         return [
             'job' => $job->refresh(),
             'created' => true,
+            'dispatch' => $dispatch,
         ];
     }
 }

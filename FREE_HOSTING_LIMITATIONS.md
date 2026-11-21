@@ -15,3 +15,12 @@ Honest limitations of the planned no-card deployment. Nothing here is production
 ## Current verification status
 
 Not yet deployed (Phase 8). The verification checklist (signup requirements, quotas, minutes) will be performed with the live providers at that point and recorded here.
+
+## Render specifics (Phase 8 primary target)
+
+- Free web services run on 0.1 CPU / 512 MB RAM and sleep after ~15 minutes without traffic; the first request after a sleep takes about a minute. Fine for a portfolio demo, not for production latency expectations.
+- 750 instance-hours per month (one always-on service, or several services sharing the pool); 100 GB/month outbound bandwidth.
+- The filesystem is wiped on deploy/restart: logs and temp files vanish; all durable data must live in TiDB.
+- Render's free PostgreSQL expires 30 days after creation - therefore the database remains TiDB Cloud Starter (MySQL-compatible, no card required).
+- Free instances have no persistent disk and no Redis: sessions/cache must use the database (or cookie store), which DEPLOYMENT.md configures.
+- Never add a payment card or enable paid add-ons; if Render's free tier changes, fall back to documented local operation or re-verify Hostless.

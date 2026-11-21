@@ -65,7 +65,7 @@ class WebsiteApiController extends Controller
         $result = $this->analysisJobService->startAnalysis($website, $request->user(), $request);
 
         return (new AnalysisJobResource($result['job']))
-            ->additional(['job_created' => $result['created']])
+            ->additional(['job_created' => $result['created'], 'dispatch' => $result['dispatch']])
             ->response()
             ->setStatusCode($result['created'] ? 202 : 200);
     }
