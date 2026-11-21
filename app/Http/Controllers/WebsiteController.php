@@ -1,0 +1,99 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Requests\StoreWebsiteRequest;
+use App\Models\AuditLog;
+use App\Models\Project;
+use App\Models\Website;
+use App\Services\Analysis\AnalysisJobService;
+use App\Services\Security\UrlValidator;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\View\View;
+
+class WebsiteController extends Controller
+{
+    public function __construct(
+        private UrlValidator $urlValidator,
+        private AnalysisJobService $analysisJobService,
+    ) {
+    }
+
+    public function store(StoreWebsiteRequest $request): RedirectResponse
+    {
+        $project = Project::findOrFail($request->integer('project_id'));
+        $this->authorize('view', $project);
+
+        $validation = $this->urlValidator->validate($request->input('url'));
+
+        if (! $validation['valid']) {
+            return back()
+                ->withErrors(['url' => $validation['error']])
+                ->withInput();
+        }
+
+        $website = $project->websites()->firstOrCreate(
+            ['url_hash' => $validation['url_hash']],
+            [
+                'user_id' => $project->user_id,
+                'url' => trim($request->input('url')),
+                'normalized_url' => $validation['normalized_url'],
+                'host' => $validation['host'],
+                'label' => $request->input('label'),
+            ],
+        );
+
+        AuditLog::record('website.created', auth()->id(), $website, ['host' => $website->host], $request->ip(), $request->userAgent());
+
+        return redirect()
+            ->route('websites.show', $website)
+            ->with('status', $website->wasRecentlyCreated
+                ? 'Website added to project.'
+                : 'This website already exists in the project.');
+    }
+
+    public function show(Website $website): View
+    {
+        $this->authorize('view', $website);
+
+        $website->load(['project']);
+
+        $jobs = $website->analysisJobs()
+            ->latest('id')
+            ->take(20)
+            ->get();
+
+        return view('websites.show', [
+            'website' => $website,
+            'jobs' => $jobs,
+        ]);
+    }
+
+    public function destroy(Request $request, Website $website): RedirectResponse
+    {
+        $this->authorize('delete', $website);
+
+        $projectId = $website->project_id;
+        $website->delete();
+
+        AuditLog::record('website.deleted', auth()->id(), null, ['website_id' => $website->id, 'host' => $website->host], $request->ip(), $request->userAgent());
+
+        return redirect()
+            ->route('projects.show', $projectId)
+            ->with('status', 'Website removed.');
+    }
+
+    public function analyze(Request $request, Website $website): RedirectResponse
+    {
+        $this->authorize('analyze', $website);
+
+        [$job, $created] = array_values($this->analysisJobService->startAnalysis($website, $request->user(), $request));
+
+        if (! $created) {
+            return back()->with('status', 'An analysis is already running for this website.');
+        }
+
+        return back()->with('status', 'Analysis job created and queued. The crawler runner (Phase 2) will pick it up.');
+    }
+}
