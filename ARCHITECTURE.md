@@ -66,8 +66,10 @@ analyze (web UI or API)
     -> CallbackVerifier (HMAC + timestamp window + nonce) -> CrawlerCallbackService
         -> validation (20-page cap, host match, field limits), terminal-state guard (409)
         -> persist crawled_pages + crawl_errors, job moved to completed, websites.last_analyzed_at
-    -> (Phase 3+) intelligence services consume the same stored crawl evidence
+    -> (Phase 3) intelligence services consume the same stored crawl evidence
 ```
+
+Phase 3 additions: `CrawlerCallbackService` now invokes `AnalysisPipeline.run(job)` after persisting a completed crawl; the pipeline runs `TechnicalAuditService` (8 pass/warn/fail/unknown checks) and `CampaignReadinessService` (7-criterion weighted heuristic Campaign Readiness Score) and persists into `technical_audits`, `marketing_scores` (per-module scoring store) and `campaign_insights` (prioritised findings with evidence). Re-running `php artisan analysis:reprocess <uuid>` regenerates them idempotently. Scores are heuristic, derived only from crawl evidence, and labelled as not validated ML predictions.
 
 Alternative execution without any cloud: `php artisan analysis:run-local --all --engine=http` runs the same Node crawler locally and feeds results through the callback service directly (no HTTP hop), and `php artisan analysis:prune-stale` reaps timed-out pending/dispatched jobs.
 

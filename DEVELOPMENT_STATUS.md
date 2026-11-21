@@ -1,10 +1,10 @@
 # DEVELOPMENT_STATUS
 
-Last updated: Phase 2 completion.
+Last updated: Phase 3 completion.
 
 ## Current phase
 
-**PHASE 2 - SECURE CRAWLER (complete).** Phases 3-8 not started.
+**PHASE 3 - TECHNICAL AND MARKETING ANALYSIS (complete).** Phases 4-8 not started.
 
 Deployment target decision: **Render (free web service) + TiDB Cloud Starter + GitHub Actions crawler** is the Phase 8 target (user-approved). Hostless remains documented as a fallback.
 
@@ -37,10 +37,20 @@ Deployment target decision: **Render (free web service) + TiDB Cloud Starter + G
 - UI: analysis screen now shows latest crawl results (page table with title/HTTP/depth/text length/load time), crawl errors, and a real modules-pending notice
 - GHA workflow `.github/workflows/crawler.yml` (workflow_dispatch with job_id/target_url/callback_url inputs; installs playwright + chromium; the runner POSTs the HMAC-signed callback itself so no token appears in logs)
 
+### Phase 3 - Technical and Marketing Analysis
+- Analysis pipeline (`AnalysisPipeline`): after every completed crawl callback, runs the technical audit + campaign readiness scoring, persists results, and is re-runnable via `php artisan analysis:reprocess <uuid>` (idempotent: audit/score rows update in place, insights are replaced)
+- Technical audit service: 8 evidence-backed checks (HTTPS on entry page, 2xx response coverage, titles present/unique, meta description coverage, mobile viewport tag, observed load time, homepage content depth, crawl errors); unknown checks are excluded from the score with weights renormalized over known checks
+- Campaign readiness service (Module 1 scoring engine): 7 weighted criteria (value proposition 20%, CTA effectiveness 20%, landing-page relevance 15%, offer clarity 15%, lead capture readiness 15%, mobile usability 10%, trust signals 5%); unknown criteria excluded with weight renormalization; heuristic caps (< 100) because visual/behavioural data is unavailable from URL-only crawls; every criterion carries score/weight/evidence/explanation/confidence/recommendation
+- Findings: campaign + technical insights stored in `campaign_insights` with priority (high/medium/low), evidence, recommendation, effort, direction, confidence; priority derived from criterion score + weight
+- Schema tables (migrated): `technical_audits`, `marketing_scores` (per-module scoring store for later phases), `campaign_insights`
+- API: `GET /api/websites/{id}/campaign-intelligence` (auth:sanctum + ownership policy) returns persisted campaign readiness, technical audit and insights, or an honest "no completed analysis yet"
+- UI: website page now renders the real Campaign Readiness Score with per-criterion breakdown and evidence, the technical audit check list (pass/warn/fail/unknown), and prioritised findings & recommendations
+- Methodology honesty: all scores labelled heuristic, URL-only evidence, "not a validated ML prediction"
+
 ## Incomplete features (planned phases - never faked in UI)
 
-- Phase 3: technical audit, mobile readiness, marketing analysis, Campaign Readiness Score (schema tables `technical_audits`, `performance_audits` still to come; `page_features` rows will be populated during inference)
-- Phase 4: seven intelligence modules with UI screens + budget calculators
+- `performance_audits` table deferred until a Lighthouse/PageSpeed or similar data source is available (Phase 2 crawl timing is used as a relative indicator inside the technical audit in the meantime)
+- Phase 4: seven intelligence modules with UI screens + budget calculators (Module 1 scoring exists; the remaining 6 modules and their screens come in Phase 4)
 - Phase 5: AI Marketing Advisor (rule-based + optional external AI)
 - Phase 6: charts, historical comparison, PDF/CSV reports
 - Phase 7: security/QA audit, crawler stress tests
@@ -48,8 +58,9 @@ Deployment target decision: **Render (free web service) + TiDB Cloud Starter + G
 
 ## Tests executed
 
-- Laravel: `php artisan test` - **118 passed, 0 failed** (353 assertions), SQLite in-memory, PHP 8.3.22, Laravel 12
+- Laravel: `php artisan test` - **143 passed, 0 failed** (460 assertions), SQLite in-memory, PHP 8.3.22, Laravel 12 (Unit: 74/241, Feature: 69/219)
 - Crawler: `node --test crawler/test/crawler.test.js` - **21 passed, 0 failed**, Node v22.23.5
+- Live Phase 3 reprocessing (executed): `php artisan analysis:reprocess` against the stored books.toscrape.com 20-page crawl produced Campaign Readiness 45/100 and Technical audit 69/100 with 8 insights; spot-checked evidence strings match real crawl data (H1 "All products", no meta description, no viewport meta, no lead forms), confidence high
 - Live end-to-end (executed in this environment): registered a user via real forms over local HTTP, created a project + website, started an analysis through the real job service (dispatch honestly unconfigured -> pending), ran `php artisan analysis:run-local --all`, the crawler fetched books.toscrape.com (20 pages, bounded), the callback service persisted pages/errors/features, job became `completed`, `websites.last_analyzed_at` updated
 - Live SSRF checks (executed): loopback 127.0.0.1, private 10.0.0.1 and link-local 169.254.169.254 -> `blocked_ip`; `metadata.google.internal` and `*.localhost` -> `blocked_hostname`; non-existent host -> structured `dns_failure`
 - Live positive crawls: example.com (1 page), books.toscrape.com (6 pages, depth ordering correct)
@@ -59,7 +70,8 @@ Details in [TESTING.md](TESTING.md).
 
 ## Known bugs
 
-- None open. (Fixed during Phase 2: worker-pool early-exit race in BFS; `WebsiteFactory` ignored explicit `url` overrides; nested-heading arrays crashed callback persistence; fake-host DNS in redirect tests.)
+- None open. (Fixed during Phase 2: worker-pool early-exit race in BFS; `WebsiteFactory` ignored explicit `url` overrides; nested-heading arrays crashed callback persistence; fake-host DNS in redirect tests. Fixed during Phase 3: integer division made `$share === 1.0` false for perfect sites, so healthy sites scored "warn" instead of "pass" - shares are now cast to float.)
+- One transient, non-reproducible failure occurred in a single isolated Feature-suite run during Phase 3 development (test not captured before re-run); 6 subsequent full/isolated runs all pass. Being watched; no code suspect identified yet.
 
 ## Known limitations (honest)
 
@@ -68,6 +80,7 @@ Details in [TESTING.md](TESTING.md).
 - Dispatcher requires `GITHUB_TOKEN`, `GITHUB_REPO` (private repo works) and `CRAWLER_CALLBACK_BASE_URL`; without them jobs stay pending (displayed as pending, never as completed).
 - Playwright engine not exercised in this sandbox (Chromium download blocked by the environment proxy); the `http` engine was exercised live instead. The GHA workflow pins a fixed playwright version for the CI engine.
 - Screenshots are optional (`--screenshot-dir`) and are not sent in the callback payload; `page_snapshots` therefore stays empty in this phase.
+- Scores are heuristic and derived only from crawl evidence (metadata, headings, feature presence/counts, timings); they are explicitly labelled as such in UI and API, and no real advertising metrics (spend, CPC, CPA, CR, ROAS) exist anywhere in the system yet.
 - No paid services are used or required by anything built so far.
 
 ## Deployment status

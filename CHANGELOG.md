@@ -25,3 +25,14 @@ Added:
 - Analysis screen now renders real crawl results (pages, stats, errors)
 - Tests: 118 Laravel (353 assertions) + 21 crawler node tests, all passing; live 20-page end-to-end crawl executed
 - Docs updated for the Render + TiDB Phase 8 target (DEVELOPMENT_STATUS, DEPLOYMENT, FREE_HOSTING_LIMITATIONS, ARCHITECTURE, API_DOCUMENTATION, SECURITY, TESTING)
+
+## Phase 3 - Technical and Marketing Analysis
+
+- Analysis pipeline (`AnalysisPipeline`): after each completed crawl callback, runs the technical audit and campaign-readiness scoring and persists results; idempotent (scores/audits update in place, findings replaced); pipeline errors are caught, audited, and never falsify the crawl status
+- `TechnicalAuditService` (v1.0): 8 evidence-backed checks (HTTPS, 2xx coverage, titles present/unique, meta description coverage, mobile viewport tag, observed load time, homepage content depth, crawl errors); pass/warn/fail/unknown with score over known checks only
+- `CampaignReadinessService` (v1.0): 7-criterion weighted heuristic Campaign Readiness Score (value proposition 20, CTA effectiveness 20, landing relevance 15, offer clarity 15, lead capture 15, mobile usability 10, trust signals 5); unknown criteria excluded with weight renormalization; heuristic caps below 100; every criterion carries score, weight, evidence, explanation, confidence and a recommendation; UI + API label the score heuristic and "not a validated ML prediction"
+- Findings stored in new `campaign_insights` table with priority/evidence/recommendation/effort/direction/confidence; new `technical_audits` and `marketing_scores` tables (migrated; `marketing_scores` is the shared per-module scoring store for later phases)
+- New API endpoint `GET /api/websites/{id}/campaign-intelligence` (auth + ownership) and a new console command `analysis:reprocess <uuid>`
+- Website page now renders the real Campaign Readiness Score with per-criterion evidence, the technical audit check list, and prioritised findings & recommendations
+- Tests: 143 Laravel (460 assertions) + 21 crawler node tests, all passing; live reprocessing of the stored books.toscrape.com crawl executed (Campaign Readiness 45/100, Technical 69/100, 8 insights, evidence spot-checked against real crawl data)
+- Fixed in this phase: float-cast crawler share comparison (healthy sites scored "warn" instead of "pass"); duplicate SQLite index in the technical_audits migration

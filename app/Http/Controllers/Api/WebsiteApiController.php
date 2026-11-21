@@ -6,7 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreWebsiteRequest;
 use App\Http\Resources\AnalysisJobResource;
 use App\Http\Resources\WebsiteResource;
+use App\Models\CampaignInsight;
+use App\Models\MarketingScore;
 use App\Models\Project;
+use App\Models\TechnicalAudit;
 use App\Models\Website;
 use App\Services\Analysis\AnalysisJobService;
 use App\Services\Security\UrlValidator;
@@ -68,5 +71,54 @@ class WebsiteApiController extends Controller
             ->additional(['job_created' => $result['created'], 'dispatch' => $result['dispatch']])
             ->response()
             ->setStatusCode($result['created'] ? 202 : 200);
+    }
+
+    public function campaignIntelligence(Website $website): JsonResponse
+    {
+        $this->authorize('view', $website);
+
+        $job = $website->analysisJobs()->where('status', 'completed')->latest()->first();
+
+        if ($job === null) {
+            return response()->json([
+                'website_id' => $website->id,
+                'data' => null,
+                'message' => 'No completed analysis yet. Run an analysis first; results are unavailable until a crawl has completed.',
+            ]);
+        }
+
+        $audit = TechnicalAudit::where('analysis_job_id', $job->id)->first();
+        $score = MarketingScore::where('analysis_job_id', $job->id)->where('module_key', 'campaign_readiness')->first();
+        $insights = CampaignInsight::where('analysis_job_id', $job->id)
+            ->orderByRaw("case priority when 'high' then 0 when 'medium' then 1 else 2 end")
+            ->orderBy('id')
+            ->get();
+
+        return response()->json([
+            'website_id' => $website->id,
+            'analysis_job' => ['uuid' => $job->uuid, 'finished_at' => $job->finished_at?->toISOString()],
+            'campaign_readiness' => $score === null ? null : [
+                'score' => $score->score,
+                'version' => $score->version,
+                'methodology' => $score->methodology,
+                'computed_at' => $score->computed_at?->toISOString(),
+                'breakdown' => $score->breakdown,
+            ],
+            'technical_audit' => $audit === null ? null : [
+                'score' => $audit->score,
+                'version' => $audit->version,
+                'checks' => $audit->checks,
+            ],
+            'insights' => $insights->map(fn (CampaignInsight $insight) => [
+                'module_key' => $insight->module_key,
+                'priority' => $insight->priority,
+                'title' => $insight->title,
+                'evidence' => $insight->evidence,
+                'recommendation' => $insight->recommendation,
+                'effort' => $insight->effort,
+                'direction' => $insight->direction,
+                'confidence' => $insight->confidence,
+            ]),
+        ]);
     }
 }

@@ -6,6 +6,7 @@ use App\Models\AnalysisJob;
 use App\Models\AuditLog;
 use App\Models\CrawlError;
 use App\Models\CrawledPage;
+use App\Services\Analysis\AnalysisPipeline;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
@@ -134,6 +135,8 @@ class CrawlerCallbackService
         });
 
         AuditLog::record('crawler_callback.completed', $job->user_id, $job, ['pages' => count($payload['pages'])]);
+
+        app(AnalysisPipeline::class)->run($job->refresh());
 
         return ['status' => 200, 'outcome' => 'completed', 'message' => 'Crawl results stored.'];
     }

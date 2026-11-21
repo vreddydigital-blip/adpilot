@@ -89,6 +89,7 @@
             $completedErrors = $completedJob
                 ? $completedJob->crawlErrors()->orderBy('id')->take(20)->get()
                 : collect();
+            $criteria = collect($readinessScore?->breakdown['criteria'] ?? []);
         @endphp
 
         @if ($completedJob)
@@ -169,11 +170,152 @@
             </div>
 
             <div class="bg-slate-800/60 rounded-xl p-6 shadow border border-slate-700/50">
-                <h3 class="text-lg font-medium text-white">Intelligence modules</h3>
-                <p class="text-sm text-gray-400 mt-2">
-                    Crawl data is stored. Module scoring (campaign readiness, conversion opportunities, budget tools, lead readiness,
-                    creative analysis, advisor) is produced by Phases 3–5 and will appear here once implemented. No scores are
-                    calculated yet, so none are shown.
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <h3 class="text-lg font-medium text-white">Campaign Intelligence</h3>
+                    @if ($readinessScore)
+                        <div class="flex items-center gap-4">
+                            <div class="text-right">
+                                <p class="text-xs uppercase text-gray-400">Heuristic Campaign Readiness Score</p>
+                                <p class="text-3xl font-semibold text-emerald-400">{{ $readinessScore->score ?? 'n/a' }}<span class="text-base text-gray-500">/100</span></p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xs uppercase text-gray-400">Confidence</p>
+                                <p class="text-sm font-medium text-gray-300">{{ $readinessScore->breakdown['confidence'] ?? '—' }}</p>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+                @if ($readinessScore)
+                    <p class="text-xs text-gray-500 mt-2">
+                        {{ $readinessScore->breakdown['summary'] ?? '' }} Weighted heuristic methodology, URL-only evidence —
+                        not a validated prediction of campaign performance. Version {{ $readinessScore->version }}.
+                    </p>
+                    <div class="overflow-x-auto mt-4 border-t border-slate-700/60">
+                        <table class="min-w-full text-sm">
+                            <thead class="text-xs uppercase text-gray-400 bg-slate-900/60">
+                                <tr>
+                                    <th class="px-4 py-3 text-left">Criterion</th>
+                                    <th class="px-4 py-3 text-left">Score</th>
+                                    <th class="px-4 py-3 text-left">Weight</th>
+                                    <th class="px-4 py-3 text-left">Evidence</th>
+                                    <th class="px-4 py-3 text-left">Recommendation</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-700/60">
+                                @foreach ($criteria as $criterion)
+                                    <tr>
+                                        <td class="px-4 py-3 text-gray-200">
+                                            {{ $criterion['label'] }}
+                                            <p class="text-xs text-gray-500">{{ $criterion['explanation'] }}</p>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            @if ($criterion['score'] === null)
+                                                <span class="text-xs text-gray-500">unknown</span>
+                                            @else
+                                                <span class="text-gray-200">{{ $criterion['score'] }}</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-4 py-3 text-gray-400">{{ $criterion['weight'] }}%</td>
+                                        <td class="px-4 py-3 text-xs text-gray-400">
+                                            <ul class="space-y-0.5">
+                                                @forelse ($criterion['evidence'] as $item)
+                                                    <li class="break-words">{{ $item }}</li>
+                                                @empty
+                                                    <li class="text-gray-500">No evidence recorded.</li>
+                                                @endforelse
+                                            </ul>
+                                        </td>
+                                        <td class="px-4 py-3 text-xs text-gray-300">{{ $criterion['recommendation'] }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <p class="text-sm text-gray-400 mt-3">
+                        Campaign readiness scoring has not been computed for the latest crawl data yet. Reprocess with
+                        <code class="text-emerald-300">php artisan analysis:reprocess {{ $completedJob?->uuid }}</code> to generate it.
+                    </p>
+                @endif
+            </div>
+
+            <div class="bg-slate-800/60 rounded-xl p-6 shadow border border-slate-700/50">
+                <h3 class="text-lg font-medium text-white">Technical audit</h3>
+                @if ($technicalAudit)
+                    <div class="flex items-center gap-3 mt-2">
+                        <p class="text-2xl font-semibold text-white">{{ $technicalAudit->score ?? 'n/a' }}<span class="text-sm text-gray-500">/100</span></p>
+                        <span class="text-xs text-gray-500">heuristic check score · version {{ $technicalAudit->version }}</span>
+                    </div>
+                    <ul class="mt-4 space-y-2 text-sm">
+                        @foreach ($technicalAudit->checks ?? [] as $check)
+                            <li class="flex flex-wrap items-start gap-2">
+                                @php
+                                    $statusColors = [
+                                        'pass' => 'text-emerald-400 bg-emerald-900/30 border-emerald-700/50',
+                                        'warn' => 'text-amber-300 bg-amber-900/30 border-amber-700/50',
+                                        'fail' => 'text-rose-300 bg-rose-900/30 border-rose-700/50',
+                                        'unknown' => 'text-gray-400 bg-slate-900/60 border-slate-600/50',
+                                    ];
+                                @endphp
+                                <span class="px-2 py-0.5 rounded border text-xs uppercase {{ $statusColors[$check['status']] ?? $statusColors['unknown'] }}">
+                                    {{ $check['status'] }}
+                                </span>
+                                <span class="text-gray-200">{{ $check['label'] }}</span>
+                                @if ($check['value'])
+                                    <span class="text-xs text-gray-400">{{ $check['value'] }}</span>
+                                @endif
+                                @if (! empty($check['evidence']))
+                                    <ul class="w-full text-xs text-gray-500">
+                                        @foreach ($check['evidence'] as $item)
+                                            <li class="break-all">{{ $item }}</li>
+                                        @endforeach
+                                    </ul>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                @else
+                    <p class="text-sm text-gray-400 mt-2">No technical audit stored for the latest completed job yet.</p>
+                @endif
+            </div>
+
+            <div class="bg-slate-800/60 rounded-xl p-6 shadow border border-slate-700/50">
+                <h3 class="text-lg font-medium text-white">Findings &amp; recommendations</h3>
+                @if ($insights->isNotEmpty())
+                    <ul class="mt-4 space-y-3">
+                        @foreach ($insights as $insight)
+                            <li class="rounded-lg border border-slate-700/60 bg-slate-900/40 p-4">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    @php
+                                        $priorityColors = [
+                                            'high' => 'text-rose-300 bg-rose-900/30 border-rose-700/50',
+                                            'medium' => 'text-amber-300 bg-amber-900/30 border-amber-700/50',
+                                            'low' => 'text-sky-300 bg-sky-900/30 border-sky-700/50',
+                                        ];
+                                    @endphp
+                                    <span class="px-2 py-0.5 rounded border text-xs uppercase {{ $priorityColors[$insight->priority] ?? '' }}">{{ $insight->priority }}</span>
+                                    <span class="text-sm text-gray-200">{{ $insight->title }}</span>
+                                    <span class="text-xs text-gray-500">effort: {{ $insight->effort }} · confidence: {{ $insight->confidence }}</span>
+                                </div>
+                                @if ($insight->evidence)
+                                    <ul class="mt-2 text-xs text-gray-500 space-y-0.5">
+                                        @foreach ($insight->evidence as $item)
+                                            <li class="break-words">Evidence: {{ $item }}</li>
+                                        @endforeach
+                                    </ul>
+                                @endif
+                                @if ($insight->recommendation)
+                                    <p class="mt-2 text-sm text-gray-300">{{ $insight->recommendation }}</p>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                @else
+                    <p class="text-sm text-gray-400 mt-2">No findings recorded — every scored criterion reached its threshold for this job.</p>
+                @endif
+                <p class="text-xs text-gray-500 mt-4">
+                    Remaining intelligence modules (predictive analytics, budget tools, wasted-spend, lead readiness detail,
+                    creative analysis, AI advisor) are produced by Phases 4–5 and will appear here once implemented.
                 </p>
             </div>
         @endif

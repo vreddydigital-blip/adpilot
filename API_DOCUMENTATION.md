@@ -56,7 +56,32 @@ Job status lookup, rate-limited to 60 per minute. 403 if not owned.
 
 ## Planned endpoints (later phases)
 
-`/api/websites/{id}/overview`, `/api/websites/{id}/campaign-intelligence`, `/api/websites/{id}/predictive-analytics`, `/api/websites/{id}/budget-intelligence`, `/api/websites/{id}/wasted-spend`, `/api/websites/{id}/lead-intelligence`, `/api/websites/{id}/creative-intelligence`, `/api/websites/{id}/marketing-advisor`, `/api/websites/{id}/budget-scenarios`, `/api/reports/{id}`, `/api/internal/crawler-callback`.
+`/api/websites/{id}/overview`, `/api/websites/{id}/campaign-intelligence` (implemented - see below), `/api/websites/{id}/predictive-analytics`, `/api/websites/{id}/budget-intelligence`, `/api/websites/{id}/wasted-spend`, `/api/websites/{id}/lead-intelligence`, `/api/websites/{id}/creative-intelligence`, `/api/websites/{id}/marketing-advisor`, `/api/websites/{id}/budget-scenarios`, `/api/reports/{id}`, `/api/internal/crawler-callback`.
+
+### GET /api/websites/{id}/campaign-intelligence (Phase 3)
+
+Requires Sanctum auth; ownership enforced via the website policy.
+
+- If the website has no completed analysis job: `200` with `data: null` and `message: "No completed analysis yet. Run an analysis first; results are unavailable until a crawl has completed."`
+- Else returns the data persisted by the analysis pipeline for the latest completed job:
+
+```json
+{
+  "website_id": 1,
+  "analysis_job": { "uuid": "...", "finished_at": "..." },
+  "campaign_readiness": {
+    "score": 45,
+    "version": "v1.0",
+    "methodology": "heuristic",
+    "computed_at": "...",
+    "breakdown": { "criteria": [ { "key": "value_proposition", "weight": 20, "score": 85, "evidence": ["..."], "explanation": "...", "confidence": "medium", "recommendation": "..." } ], "confidence": "high", "methodology": "weighted heuristic (v1.0); URL-only evidence; not a validated ML prediction", "summary": "..." }
+  },
+  "technical_audit": { "score": 69, "version": "v1.0", "checks": [ { "key": "https", "label": "...", "status": "pass", "value": "https", "evidence": [], "explanation": "...", "recommendation": null } ] },
+  "insights": [ { "module_key": "campaign_readiness", "priority": "high", "title": "...", "evidence": [], "recommendation": "...", "effort": "low", "direction": "improvement", "confidence": "medium" } ]
+}
+```
+
+`campaign_readiness.score` is a heuristic score derived from crawl evidence; criteria with missing evidence have `score: null` and their weight is redistributed. `insights` is ordered high -> medium -> low.
 
 The internal crawler callback will use a shared-secret HMAC signature, timestamp-based replay protection, and strict job ownership checks (Phase 2).
 

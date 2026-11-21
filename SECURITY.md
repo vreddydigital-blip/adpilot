@@ -33,3 +33,9 @@ Report suspected security issues in this portfolio project by opening a private 
 - Terminal-state guard: callbacks for completed/failed/cancelled jobs return 409 and mutate nothing.
 - Secret management: `CRAWLER_CALLBACK_SECRET` exists only as a server-side environment variable and as a GitHub Actions repository secret runner-side. It is separate from the `GITHUB_TOKEN`, which never leaves the dispatcher and is never forwarded into crawler logs.
 - The dispatch uses the repository `workflow_dispatch` API with a fixed input allow-list (`job_id`, `target_url`, `callback_url`); the crawl runs only in the private repository.
+
+## Phase 3 additions
+
+- `GET /api/websites/{id}/campaign-intelligence` lives inside the `auth:sanctum` group and authorizes through the existing website ownership policy (403 for other users, 401 unauthenticated); the token-authenticated feature tests cover all three cases.
+- The analysis pipeline only consumes already-stored crawl rows; it never accepts external payload data beyond the validated crawler callback, so no trust boundary is crossed by scoring.
+- Pipeline failures are audited (`analysis_pipeline.failed`) and cannot upgrade a crawl to completed retroactively - the callback flow itself still controls the job lifecycle; the pipeline only ever marks a job completed after results from an already-successful crawl persist.

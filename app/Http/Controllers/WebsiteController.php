@@ -6,6 +6,9 @@ use App\Http\Requests\StoreWebsiteRequest;
 use App\Models\AuditLog;
 use App\Models\Project;
 use App\Models\Website;
+use App\Models\CampaignInsight;
+use App\Models\MarketingScore;
+use App\Models\TechnicalAudit;
 use App\Services\Analysis\AnalysisJobService;
 use App\Services\Security\UrlValidator;
 use Illuminate\Http\RedirectResponse;
@@ -64,9 +67,24 @@ class WebsiteController extends Controller
             ->take(20)
             ->get();
 
+        $completedJob = $jobs->firstWhere('status', 'completed');
+        $technicalAudit = $completedJob ? TechnicalAudit::where('analysis_job_id', $completedJob->id)->first() : null;
+        $readinessScore = $completedJob
+            ? MarketingScore::where('analysis_job_id', $completedJob->id)->where('module_key', 'campaign_readiness')->first()
+            : null;
+        $insights = $completedJob
+            ? CampaignInsight::where('analysis_job_id', $completedJob->id)
+                ->orderByRaw("case priority when 'high' then 0 when 'medium' then 1 else 2 end")
+                ->orderBy('id')
+                ->get()
+            : collect();
+
         return view('websites.show', [
             'website' => $website,
             'jobs' => $jobs,
+            'technicalAudit' => $technicalAudit,
+            'readinessScore' => $readinessScore,
+            'insights' => $insights,
         ]);
     }
 

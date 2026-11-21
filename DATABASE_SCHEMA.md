@@ -1,4 +1,4 @@
-# DATABASE_SCHEMA (Phase 1)
+# DATABASE_SCHEMA
 
 Foundation tables from the Laravel skeleton (`users`, `cache`, `jobs`, plus Breeze's tables) are unchanged. All business tables below are new.
 
@@ -120,10 +120,44 @@ The per-page `features` JSON on `crawled_pages` is already populated; these norm
 | message | varchar(1000) | truncated |
 | occurred_at | timestamp | |
 
+## Technical analysis tables (created in Phase 3)
+
+### technical_audits
+
+- `id`, `analysis_job_id` (FK -> analysis_jobs, cascade, **unique** - one audit per job), `website_id` (FK -> websites, cascade, indexed)
+- `score` unsigned tiny int nullable (null = not computable; not computed means "unknown", never 0)
+- `checks` json - array of check objects: `key`, `label`, `status` (pass|warn|fail|unknown), `value`, `evidence[]`, `explanation`, `recommendation`
+- `version` string(20) default `v1.0` - audit rule-set version
+- timestamps
+
+Indexes: unique `analysis_job_id`, indexed `website_id` (from FK).
+
+## Intelligence tables (Phase 3 portion)
+
+### marketing_scores
+
+- `id`, `website_id` (FK, cascade, indexed), `analysis_job_id` (FK, cascade)
+- `module_key` string(60) - e.g. `campaign_readiness`; later phases add more module keys
+- `score` unsigned tiny int nullable, `methodology` string(80) default `heuristic` (method label stored with the score), `version` string(20) `v1.0` (scoring version)
+- `breakdown` json - for campaign readiness: `criteria[]` (score, weight, evidence, explanation, confidence, recommendation), `confidence`, `methodology`, `summary`
+- `computed_at` timestamp nullable, timestamps
+
+Constraints: **unique (`analysis_job_id`, `module_key`)** (idempotent re-processing), index (`website_id`, `module_key`), index `website_id`.
+
+### campaign_insights
+
+- `id`, `website_id` (FK, cascade, indexed), `analysis_job_id` (FK, cascade)
+- `module_key` string(60) (`campaign_readiness` | `technical_audit`), `priority` string(20) (`high`|`medium`|`low`)
+- `title` string(255), `evidence` json nullable, `recommendation` text nullable
+- `effort` string(20) nullable (low|medium|high), `direction` string(40) nullable (`improvement`), `confidence` string(20) nullable
+- timestamps
+
+Indexes: (`analysis_job_id`, `module_key`), (`website_id`, `priority`), index `website_id`. Insights are replaced (deleted + re-inserted) on each pipeline run for a job, so there is no uniqueness constraint.
+
 ## Planned tables (created in later phases)
 
-technical: `technical_audits`, `performance_audits`
-intelligence: `marketing_scores`, `campaign_insights`, `predictive_insights`, `budget_scenarios`, `waste_findings`, `lead_insights`, `creative_insights`, `recommendations`
+technical: `performance_audits` (deferred until a Lighthouse/PageSpeed-like source exists)
+intelligence: `predictive_insights`, `budget_scenarios`, `waste_findings`, `lead_insights`, `creative_insights`, `recommendations`
 reporting/admin: `reports`, `integration_settings`
 
 TiDB compatibility notes: the schema uses standard migrations; website URLs exceed TiDB index-key limits only in composite unique constraints, which is why the 64-char `url_hash` is used for the unique key.

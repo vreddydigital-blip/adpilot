@@ -1,17 +1,17 @@
 # TESTING
 
-Last executed: Phase 2 completion. Suites: `php artisan test` (SQLite in-memory) for the Laravel app and `node --test` for the crawler package.
+Last executed: Phase 3 completion. Suites: `php artisan test` (SQLite in-memory) for the Laravel app and `node --test` for the crawler package.
 
 ## Results
 
 | Suite | Tests | Assertions | Result |
 |---|---|---|---|
-| Feature | 48 | 154 | all passing |
-| Unit | 37 | 109 | all passing |
-| Laravel Feature | 60 | 184 | all passing |
-| Laravel Unit | 58 | 169 | all passing |
+| Laravel Feature | 69 | 219 | all passing |
+| Laravel Unit | 74 | 241 | all passing |
 | Crawler (node:test) | 21 | 21 node asserts | all passing |
-| **Total** | **139** | **353 assertions** | **all passed, 0 failed** |
+| **Total** | **164** | **460 assertions + crawler asserts** | **all passed, 0 failed** |
+
+Anomaly log: during Phase 3 development, one isolated Feature-suite run reported 1 failed / 68 passed; the failing test was not captured before re-run and the failure was never reproduced in 6 subsequent full and isolated runs (all pass). Being watched; no code suspect identified.
 
 Breakdown:
 - `tests/Unit/UrlValidatorTest.php` - 37 cases: valid URL acceptance/normalization (8 data sets), rejection of 28 invalid/dangerous URL classes, plus a whitespace-injection case.
@@ -24,7 +24,7 @@ Breakdown:
 ## Coverage gaps (to close in later phases)
 
 - Phase 2: crawler tests (SSRF at DNS/redirect level, timeouts, malformed pages) - crawler belongs to a separate Node.js environment.
-- Phase 3+: scoring reproducibility tests, module algorithm tests.
+- Phase 4: module algorithm tests (conversion opportunity, budget calculators, lead readiness detail, creative analysis).
 - Phase 6: report/CSV tests. Phase 7: full security audit suite.
 
 ## Test report maintenance
@@ -56,3 +56,14 @@ Live (executed during Phase 2, outside the test runner):
 
 - books.toscrape.com 20-page bounded crawl through `analysis:run-local` with full database persistence.
 - SSRF rejections (loopback/private/link-local/metadata hosts/DNS failure) against the real fetcher.
+
+## Phase 3 additions
+
+Laravel (`php artisan test`, all passing):
+
+- `tests/Unit/Analysis/CampaignReadinessServiceTest.php` (9): weights sum to 100, reproducibility (identical score + criteria for identical data), high-evidence site capped below 100, empty crawl produces null score + "no score calculated" summary, missing-feature criteria score low instead of unknown while all-unknown handling is covered by the empty case, high-priority insight for a zero-CTA site (priority `high`, direction `improvement`, concrete recommendation), strong criteria emit no insights, every criterion carries evidence/explanation/confidence/recommendation, lead-capture points accumulate (lead form = 40).
+- `tests/Unit/Analysis/TechnicalAuditServiceTest.php` (8): HTTPS check pass/fail, high-failure page scores < 50, compliant page scores > 70 with `high` confidence, load-time check `unknown` when timings absent, empty job -> null score, crawl errors downgrade to `warn`, reproducibility.
+- `tests/Feature/AnalysisPipelineTest.php` (5): pipeline persists technical audit + marketing score + insights and audits `analysis_pipeline.completed`; refuses jobs without pages (`no_pages`); re-processing is idempotent (same score, 1 score row, 1 audit row, insights not duplicated); `analysis:reprocess` command reports scores and fails cleanly for an unknown/unfinished job UUID; a thrown service error is caught, audited (`analysis_pipeline.failed`) and never marks the crawl failed.
+- `tests/Feature/CampaignIntelligenceApiTest.php` (4): owner receives persisted readiness/technical/insights JSON (7 criteria, heuristic methodology), cross-user 403, unauthenticated 401, honest `data: null` message when no completed analysis exists.
+
+Bug found by these tests: PHP integer division made `$share === 1.0` false for fully healthy sites (scored "warn" instead of "pass"); shares are now explicit `(float)` casts.

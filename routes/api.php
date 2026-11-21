@@ -19,6 +19,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/websites/{website}', [WebsiteApiController::class, 'show']);
     Route::post('/websites/{website}/analyze', [WebsiteApiController::class, 'analyze'])
         ->middleware('throttle:20,1');
+    Route::get('/websites/{website}/campaign-intelligence', [WebsiteApiController::class, 'campaignIntelligence'])
+        ->middleware('throttle:60,1');
 
     Route::get('/analysis-jobs/{analysis_job}', [AnalysisJobApiController::class, 'show'])
         ->middleware('throttle:60,1');
