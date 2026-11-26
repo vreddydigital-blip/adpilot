@@ -60,3 +60,9 @@ Full audit pass (all items verified, none faked):
 - **Sessions** - `http_only` and `same_site=lax` defaults in place; `SESSION_SECURE_COOKIE=true` documented for HTTPS deployments in DEPLOYMENT.md.
 - **Debug exposure** - `APP_DEBUG=true` in `.env.example` is local-only; the deployment checklist requires `APP_DEBUG=false` in production.
 - **Dependency surface** - `composer audit` clean after the Phase 7 update; risk profile reviewed: only the transitive Symfony components of Laravel 12, dompdf (used with `isRemoteEnabled=false`) and vetted first-party packages.
+
+## Phase 8 additions - production edge
+
+- **Trusted proxies** - `bootstrap/app.php` honours the `TRUSTED_PROXIES` env variable. On Render it must be `*` (the platform proxy is the only ingress), which restores the real client IP from `X-Forwarded-For` for audit logs and honours `X-Forwarded-Proto` so `https` URL generation works behind TLS termination. Locally it stays unset (default: no proxy trust - headers cannot spoof IPs). Behaviour is covered by `TrustedProxyTest`.
+- **Production container** - the committed Dockerfile is deployed with the `render.yaml` env overrides (`APP_DEBUG=false`, `APP_ENV=production`, `SESSION_SECURE_COOKIE=true`); sessions/cache/queue use the database driver because free instances have no persistent disk.
+- **Secrets inventory at deploy time** - TiDB credentials, `APP_KEY` (also decrypts stored integration credentials), `CRAWLER_CALLBACK_SECRET` (must equal the Actions repository secret), and the dispatch PAT only ever live in provider secret management; the runbook forbids committing or logging any of them.

@@ -12,9 +12,18 @@ Honest limitations of the planned no-card deployment. Nothing here is production
 8. **Crawler inside the Laravel container** - explicitly avoided; Playwright cannot run reliably in small app containers.
 9. **Provider terms can change** - if a provider stops offering a no-card tier, deployment stops and the change is documented here rather than silently upgrading to a paid plan.
 
-## Current verification status
+## Current verification status (Phase 8)
 
-Not yet deployed (Phase 8). The verification checklist (signup requirements, quotas, minutes) will be performed with the live providers at that point and recorded here.
+Deployment artifacts are committed (`Dockerfile`, `.dockerignore`, `render.yaml` Blueprint, trusted-proxy middleware setup); the full runbook is in [DEPLOYMENT.md](DEPLOYMENT.md). The build sandbox has no Docker daemon and no browser/payment ability, so the **first real deployment has not been executed** - the repository owner performs it with the runbook and records the results here:
+
+- [ ] Render sign-up genuinely card-free; Blueprint reads `render.yaml`; first build succeeds (PHP 8.3 + pdo_mysql image)
+- [ ] `migrate --force` creates all tables on TiDB Starter from the Render logs
+- [ ] `GET /up` health check passes and the service reports "Live"
+- [ ] Register -> project -> website -> Analyze -> Actions run -> callback -> `completed` works end to end
+- [ ] TiDB Starter quota behaviour verified (row/limits); app behaviour at quota exhaustion checked
+- [ ] Sleep/wake timing on the free instance observed (~15 min idle / ~1 min wake)
+
+If any provider's no-card terms have changed, record it here and stop rather than paying - the Hostless/local fallback remains fully functional.
 
 ## Render specifics (Phase 8 primary target)
 

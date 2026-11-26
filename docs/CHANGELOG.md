@@ -84,3 +84,11 @@ Added:
 - Integration settings (honest by design): `config/integrations.php` catalogue (Google Ads, Meta Ads, GA4, Google Search Console), `integration_settings` table (migrated), `IntegrationSetting` model with `encrypted:json` credentials, API (`GET/PUT/DELETE /api/integrations...`) and a new Integrations screen with sidebar link; saving credentials stores them encrypted and explicitly does **not** connect to anything - statuses are `not_connected` / `credentials_saved` only, flagged `live_connection: false`, `data_fetched: false`
 - `performance_audits`: decision recorded - deferred until a real Lighthouse/PageSpeed-style data source exists; no heuristic stand-in will be built
 - Tests: 16 new (241 Laravel total, 924 assertions: Feature 126/495 + Unit 115/429) + 21 crawler node tests, all passing
+
+## Phase 8 - Deployment (Render + TiDB + GitHub Actions)
+
+- Deployment artifacts committed: `Dockerfile` (PHP 8.3 `pdo_mysql`/`bcmath`/`opcache`/`zip` container, `composer install --no-dev`, config/route/view cache + `migrate --force` at boot, `php artisan serve` on `$PORT`), `.dockerignore` (secrets/tests/docs/local DBs excluded), `render.yaml` Render Blueprint (`runtime: docker`, `plan: free`, `healthCheckPath: /up`, production env matrix with `APP_DEBUG=false`, `SESSION_SECURE_COOKIE=true`, database session/cache/queue, `sync: false` secrets)
+- `bootstrap/app.php` now honours `TRUSTED_PROXIES` (set to `*` behind Render's TLS-terminating proxy) so audit logs capture real client IPs; covered by `TrustedProxyTest` (forwarded and direct IP recording + health endpoint)
+- `docs/DEPLOYMENT.md` finalised into a step-by-step no-card runbook: TiDB Starter setup, Render Blueprint deploy, the four deployment settings (`CRAWLER_CALLBACK_SECRET`, `GITHUB_TOKEN`, `GITHUB_REPO`, `CRAWLER_CALLBACK_BASE_URL`) + the single repository secret, first end-to-end check, env matrix, backup/export path, wallet-safe guardrails, Hostless/local fallback; `docs/FREE_HOSTING_LIMITATIONS.md` gained the fill-in verification checklist
+- Honest status: Docker builds and actual cloud sign-ups cannot be executed from the build sandbox (no Docker daemon, no browser/card); the runbook is ready for the repository owner to execute
+- Tests: 3 new (244 Laravel total, 927 assertions: Feature 129/498 + Unit 115/429) + 21 crawler node tests, all passing

@@ -1,10 +1,10 @@
 # DEVELOPMENT_STATUS
 
-Last updated: Phase 7 completion.
+Last updated: Phase 8 completion.
 
 ## Current phase
 
-**PHASE 7 - SECURITY/QA AUDIT + INTEGRATION SETTINGS (complete).** Phase 8 not started.
+**ALL EIGHT PHASES COMPLETE.** The application is feature-complete; the only outstanding step is executing the first real cloud deployment from the Phase 8 runbook (requires a browser and provider sign-up, which the build sandbox cannot do).
 
 Deployment target decision: **Render (free web service) + TiDB Cloud Starter + GitHub Actions crawler** is the Phase 8 target (user-approved). Hostless remains documented as a fallback.
 
@@ -87,18 +87,30 @@ Deployment target decision: **Render (free web service) + TiDB Cloud Starter + G
 - `performance_audits` decision: deferred until a real Lighthouse/PageSpeed-style data source exists; no heuristic stand-in will be built
 - Tests: 16 new (241 total for the Laravel app; Feature 126/495, Unit 115/429)
 
+### Phase 8 - Deployment artifacts + runbook (Render + TiDB + GitHub Actions)
+- Commit: Dockerfile (PHP 8.3 production container with pdo_mysql/bcmath/opcache/zip, no-dev composer install, boot-time config/route/view cache + `migrate --force`, `php artisan serve` on `$PORT`), `.dockerignore`, `render.yaml` Blueprint (`runtime: docker`, `plan: free`, `healthCheckPath: /up`, production env with APP_DEBUG=false, SESSION_SECURE_COOKIE=true, database session/cache/queue, `sync: false` for secrets)
+- `TRUSTED_PROXIES` middleware support in `bootstrap/app.php` (Render TLS termination -> correct client IPs/https scheme), verified by `TrustedProxyTest`
+- `docs/DEPLOYMENT.md` finalised: step-by-step no-card runbook (TiDB Cloud Starter, Render Blueprint deploy, the single required GitHub repository secret, first end-to-end browser check, troubleshooting pending jobs), complete production env matrix, backup/export path, wallet-safe guardrails, Hostless/local fallback
+- `docs/FREE_HOSTING_LIMITATIONS.md`: fill-in verification checklist for the first real deploy
+- Tests: 3 new (244 total for the Laravel app; Feature 129/498, Unit 115/429)
+
+## Outstanding (first real deployment - not executable from this sandbox)
+
+Docker builds, Render account creation, TiDB cluster creation and the end-to-end browser check require a browser and provider sign-up; the build sandbox has none of these. Follow `docs/DEPLOYMENT.md` and record the results in `docs/FREE_HOSTING_LIMITATIONS.md`.
+
 ## Incomplete features (planned phases - never faked in UI)
 
 - `performance_audits` table deferred until a Lighthouse/PageSpeed or similar data source is available (Phase 2 crawl timing is used as a relative indicator inside the technical audit in the meantime)
 - External AI provider (LLM) for the advisor: interface + config are ready, but nothing external calls any AI service today; the shipped engine is the deterministic rule-based one
 - Integration execution: credential storage exists, but no provider connector fetches real data yet (nothing is fabricated in the meantime; advertised metrics stay marked as requiring integrations)
 - `performance_audits` stays deferred until a real Lighthouse/PageSpeed-style data source exists (Phase 7 decision: no heuristic stand-in)
-- Phase 8: free hosting deployment (Render + TiDB + GitHub Actions)
+- First real cloud deployment (Render + TiDB + GitHub Actions): artifacts + runbook complete, live deployment pending owner execution
 
 ## Tests executed
 
 - Laravel: `php artisan test` - **241 passed, 0 failed** (924 assertions), SQLite in-memory, PHP 8.3.22, Laravel 12 (Unit: 115/429, Feature: 126/495)
 - Crawler: `node --test crawler/test/crawler.test.js` - **21 passed, 0 failed**, Node v22.23.5
+- Live Phase 8 verification (executed): trusted-proxy behaviour covered by real HTTP tests (forwarded + direct IP audit rows); `TRUSTED_PROXIES` wired through `bootstrap/app.php` with env-gating so a bare local install is unchanged; Docker/Render/TiDB execution explicitly out of sandbox reach (documented in DEPLOYMENT.md + FREE_HOSTING_LIMITATIONS.md)
 - Live Phase 7 verification (executed): `composer audit` clean after the symfony update; security headers present on web/API/health responses (also asserted by tests); integration settings exercised by HTTP tests including encryption-at-rest (raw DB rows contain no plaintext credential), audit-log credential-leak assertions and blank-field-keeps-old-value behaviour
 - Live Phase 6 report generation (executed): PDF and CSV generated via the real UI-equivalent service path against the stored books.toscrape.com 20-page analysis - PDF 14,047 bytes starting with `%PDF-`, CSV 85 lines with the SECTION layout, the five real score rows (technical_audit 69, campaign_readiness 45, conversion_opportunity 40, lead_intelligence 0, marketing_advisor 61), methodology rows (`rule_based` advisor) and the honesty disclaimer; score history returned all five modules for the completed jobs; `ensureFile()` regenerated a report after its stored file was deleted; Report generation is idempotent-safe (new report row per request, snapshot reproducible)
 - Live Phase 5 advisor reprocessing (executed, twice for idempotency): `analysis:reprocess` against the stored books.toscrape.com 20-page crawl kept all previous scores and added Priority score 61 (100 - mean(45,69,40,0)) and 10 prioritised recommendations consolidated from 32 module findings (#1 mobile_usability drawing on 4 modules, then metadata_quality, lead_capture, cta_effectiveness, trust_signals, contact_paths, then medium/low topics); identical output on the second run (4 scores, 10 recommendations, same leading topic)

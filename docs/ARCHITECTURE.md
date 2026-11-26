@@ -44,7 +44,7 @@ Implemented in Phase 7: global `SecurityHeaders` middleware (bootstrap middlewar
 - Extracted evidence, scores, confidence and methodology version will be stored per analysis so future reanalysis and historical comparison are possible (Phase 3+).
 - Screenshots and large artifacts will be stored outside the relational database.
 
-## Deployment topology (free hosting, Phase 8)
+## Deployment topology (free hosting, Phase 8 - artifacts implemented)
 
 - Laravel app: Render free web service (Dockerfile deployment, ephemeral filesystem - no permanent files stored locally); Hostless documented as fallback
 - Database: TiDB Cloud Starter (MySQL-compatible, TLS, zero spending limit)

@@ -1,15 +1,15 @@
 # TESTING
 
-Last executed: Phase 7 completion. Suites: `php artisan test` (SQLite in-memory) for the Laravel app and `node --test` for the crawler package.
+Last executed: Phase 8 completion. Suites: `php artisan test` (SQLite in-memory) for the Laravel app and `node --test` for the crawler package.
 
 ## Results
 
 | Suite | Tests | Assertions | Result |
 |---|---|---|---|
-| Laravel Feature | 126 | 495 | all passing |
+| Laravel Feature | 129 | 498 | all passing |
 | Laravel Unit | 115 | 429 | all passing |
 | Crawler (node:test) | 21 | 21 node asserts | all passing |
-| **Total** | **262** | **924 assertions + crawler asserts** | **all passed, 0 failed** |
+| **Total** | **265** | **927 assertions + crawler asserts** | **all passed, 0 failed** |
 
 Anomaly log: during Phase 3 development, one isolated Feature-suite run reported 1 failed / 68 passed; the failing test was not captured before re-run and the failure was never reproduced in 6 subsequent full and isolated runs (all pass). Being watched; no code suspect identified.
 
@@ -27,6 +27,7 @@ Breakdown:
 - `tests/Feature/ReportApiTest.php` (7) + `tests/Feature/ReportPagesTest.php` (5) - Phase 6 report API and web pages (see below).
 - `tests/Feature/SecurityHeadersTest.php` (3) - Phase 7 security headers on web, JSON API and the health endpoint (see below).
 - `tests/Feature/IntegrationApiTest.php` (9) + `tests/Feature/IntegrationPagesTest.php` (4) - Phase 7 integration settings (see below).
+- `tests/Feature/TrustedProxyTest.php` (3) - Phase 8 trusted-proxy and health checks (see below).
 
 ## Coverage gaps (to close in later phases)
 
@@ -127,3 +128,11 @@ Laravel (`php artisan test`, all passing; 241 tests / 924 assertions total for t
 - `tests/Feature/SecurityHeadersTest.php` (3): security headers (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` camera/microphone/geolocation denied) are present on a web page, a JSON API response and the `/up` health endpoint.
 - `tests/Feature/IntegrationApiTest.php` (9): listing/saving/removal requires Sanctum auth; the catalog lists all four providers with honest `status: not_connected`, `live_connection: false`, `data_fetched: false` and the no-fabrication note; saved credentials are stored encrypted (raw DB value contains no plaintext secret, decrypted cast returns the originals); audit logs contain only credential field names, never values; unknown providers return 404 and unlisted credential fields are dropped before storage; a second save returns 200 + keeps values for fields left blank; removal clears credentials, resets the status and is audited; removal without a stored integration is 404; settings are user-scoped.
 - `tests/Feature/IntegrationPagesTest.php` (4): guests are redirected to login; the screen lists all four providers as "Not connected" with the honest note; saving through the real form stores encrypted credentials, shows "Credentials saved" on the page and never echoes credential values back to the browser; removal through the real form clears the stored credentials.
+
+## Phase 8 additions
+
+Laravel (`php artisan test`, all passing; 244 tests / 927 assertions total for the app: Feature 129/498, Unit 115/429):
+
+- `tests/Feature/TrustedProxyTest.php` (3): with `TRUSTED_PROXIES=*` (test env), an `X-Forwarded-For` header result is recorded as the audit-log IP for a real project creation; without the header the direct client IP (`127.0.0.1`) is recorded; the `/up` health endpoint responds 200 (the Render health check path).
+
+Not executable in the build sandbox (documented, not faked): Docker image build (`docker build` with the committed Dockerfile), Render Blueprint deploy, TiDB connection - no Docker daemon, no external accounts. The DEPLOYMENT.md runbook exists for the first real deploy.
