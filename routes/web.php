@@ -33,6 +33,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/websites/{website}/lead-intelligence', [WebsiteModuleController::class, 'lead'])->name('websites.lead');
     Route::get('/websites/{website}/creative', [WebsiteModuleController::class, 'creative'])->name('websites.creative');
     Route::get('/websites/{website}/advisor', [WebsiteModuleController::class, 'advisor'])->name('websites.advisor');
+    Route::get('/websites/{website}/reports', [WebsiteModuleController::class, 'reports'])->name('websites.reports');
+    Route::post('/websites/{website}/reports', [WebsiteModuleController::class, 'storeReport'])->name('websites.reports.store');
+    Route::get('/websites/{website}/reports/{report}/download', [WebsiteModuleController::class, 'downloadReport'])->name('websites.reports.download');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

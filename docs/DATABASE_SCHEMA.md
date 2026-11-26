@@ -219,9 +219,22 @@ Indexes: (`website_id`, `created_at`), (`user_id`, `created_at`). Per-user owner
 
 Indexes: (`analysis_job_id`, `priority`), (`website_id`, `priority`), index `website_id`. Rows are replaced (deleted + re-inserted) on each pipeline run for a job.
 
+## Reporting table (created in Phase 6)
+
+### reports
+
+- `id`, `user_id` (FK, cascade, indexed), `website_id` (FK, cascade, indexed), `analysis_job_id` FK nullable (cascade, indexed)
+- `uuid` string(36) unique (report identifier + filename seed), `title` string(160)
+- `format` string(10) (`pdf`|`csv`), `status` string(20) default `ready` (ready|expired), `version` string(20) default `v1.0`
+- `path` string(255) nullable (storage path `reports/<uuid>.<ext>`), `filename` string(200), `size_bytes` unsigned int nullable
+- `payload` json nullable (the full snapshot: website/job meta, five module scores, campaign criteria, technical checks, findings, advisor recommendations, disclaimer)
+- `generator` string(60) default `dompdf` (dompdf | fputcsv), timestamps
+
+Indexes: (`user_id`, `created_at`), (`website_id`, `created_at`), index `analysis_job_id`. Files live on the local disk; with an ephemeral filesystem the `payload` allows deterministic regeneration on download.
+
 ## Planned tables (created in later phases)
 
 technical: `performance_audits` (deferred until a Lighthouse/PageSpeed-like source exists)
-reporting/admin: `reports`, `integration_settings`
+admin: `integration_settings`
 
 TiDB compatibility notes: the schema uses standard migrations; website URLs exceed TiDB index-key limits only in composite unique constraints, which is why the 64-char `url_hash` is used for the unique key.

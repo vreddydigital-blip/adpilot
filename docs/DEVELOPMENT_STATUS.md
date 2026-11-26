@@ -1,10 +1,10 @@
 # DEVELOPMENT_STATUS
 
-Last updated: Phase 5 completion.
+Last updated: Phase 6 completion.
 
 ## Current phase
 
-**PHASE 5 - MODULE 7 AI MARKETING ADVISOR (complete).** Phases 6-8 not started.
+**PHASE 6 - REPORTS, CHARTS AND HISTORICAL COMPARISON (complete).** Phases 7-8 not started.
 
 Deployment target decision: **Render (free web service) + TiDB Cloud Starter + GitHub Actions crawler** is the Phase 8 target (user-approved). Hostless remains documented as a fallback.
 
@@ -69,18 +69,29 @@ Deployment target decision: **Render (free web service) + TiDB Cloud Starter + G
 - UI: AI Advisor screen (priority score + four module score cards, executive summary with engine/priority badges, prioritised action plan cards with rationale/evidence/action/module sources) reached from the new AI Advisor tab; the campaign page now links to it
 - Tests: 14 new tests (206 total for the Laravel app; Feature 98/364, Unit 108/387)
 
+### Phase 6 - Reports, Chart.js score history and PDF/CSV export (backend + API + UI)
+- Dependencies: `dompdf/dompdf ^3.1` for PDF rendering (smoke-tested real PDF output); Chart.js 4.4.7 UMD vendored locally at `public/vendor/chart.umd.min.js` (no CDN dependency at runtime)
+- Schema: `reports` table (user/website/analysis-job FKs, uuid, title, format, status, path, filename, size_bytes, payload JSON snapshot, generator, version; (user_id, created_at) + (website_id, created_at) indexes); `Report` model with PDF/CSV format and `ready` status constants
+- `ReportGenerationService`: builds a full evidence snapshot (website/job meta, the five module scores incl. the technical audit read from `technical_audits`, campaign criteria, technical checks, advisor recommendations, all findings), renders `reports/pdf.blade.php` via dompdf (A4, `isRemoteEnabled = false`) or CSV via fputcsv - both carry the honesty disclaimer and never contain real advertising metrics; stores the file on the `local` disk and persists the payload JSON so a deleted/expired file can be regenerated from the snapshot (`ensureFile()`), or flips the report to status `expired` with an honest message
+- Score history: last 12 completed jobs in chronological order with all five module scores (campaign_readiness, technical_audit, conversion_opportunity, lead_intelligence, marketing_advisor)
+- API: `GET/POST /api/websites/{id}/reports`, `GET /api/reports/{report}`, `GET /api/reports/{report}/download` (ownership-enforced, honest 422 without a completed analysis, generation failures audited as `report.generation_failed`)
+- UI: new Reports tab (8th module tab) with pdf/csv generate buttons, a Chart.js score-history line chart fed by embedded history data (labelled "Not a marketing performance chart - all values are heuristic crawl-evidence scores"), and a stored-reports table with download links and an ephemeral-filesystem note
+- Tests: 19 new tests (225 total for the Laravel app; Feature 115/414, Unit 110/429): 7 unit (snapshot contents, PDF magic bytes, CSV sections, pending-job/format guards, ensureFile regeneration, two-job chronological history), 7 API feature (store/index/show/downloads, 422 without a completed analysis, object-level 403 + 401, format validation), 5 web-page feature (screen render, empty state, csv generation flash + download, cross-user 403, auth redirect)
+- Live verification: generated PDF (14,047 bytes with real `%PDF-` magic) and CSV (85 lines) from the real books.toscrape.com 20-page analysis; the CSV carries the real scores technical_audit 69 / campaign_readiness 45 / conversion_opportunity 40 / lead_intelligence 0 / marketing_advisor 61 with methodology rows (incl. `rule_based`); `history()` returns all five scores; regeneration after file deletion via `ensureFile()` verified
+- Watched item: `composer audit` reports 5 advisories in transitive Symfony packages; a `composer update` pass is planned in Phase 7
+
 ## Incomplete features (planned phases - never faked in UI)
 
 - `performance_audits` table deferred until a Lighthouse/PageSpeed or similar data source is available (Phase 2 crawl timing is used as a relative indicator inside the technical audit in the meantime)
 - External AI provider (LLM) for the advisor: interface + config are ready, but nothing external calls any AI service today; the shipped engine is the deterministic rule-based one
-- Phase 6: charts (Chart.js), historical comparison, PDF/CSV reports
-- Phase 7: security/QA audit, crawler stress tests
+- Phase 7: security/QA audit, integration settings, Phase 7 cleanup (`composer update` for transitive Symfony advisories); `performance_audits` stays deferred until a real data source exists
 - Phase 8: free hosting deployment (Render + TiDB + GitHub Actions)
 
 ## Tests executed
 
-- Laravel: `php artisan test` - **206 passed, 0 failed** (751 assertions), SQLite in-memory, PHP 8.3.22, Laravel 12 (Unit: 108/387, Feature: 98/364)
+- Laravel: `php artisan test` - **225 passed, 0 failed** (843 assertions), SQLite in-memory, PHP 8.3.22, Laravel 12 (Unit: 110/429, Feature: 115/414)
 - Crawler: `node --test crawler/test/crawler.test.js` - **21 passed, 0 failed**, Node v22.23.5
+- Live Phase 6 report generation (executed): PDF and CSV generated via the real UI-equivalent service path against the stored books.toscrape.com 20-page analysis - PDF 14,047 bytes starting with `%PDF-`, CSV 85 lines with the SECTION layout, the five real score rows (technical_audit 69, campaign_readiness 45, conversion_opportunity 40, lead_intelligence 0, marketing_advisor 61), methodology rows (`rule_based` advisor) and the honesty disclaimer; score history returned all five modules for the completed jobs; `ensureFile()` regenerated a report after its stored file was deleted; Report generation is idempotent-safe (new report row per request, snapshot reproducible)
 - Live Phase 5 advisor reprocessing (executed, twice for idempotency): `analysis:reprocess` against the stored books.toscrape.com 20-page crawl kept all previous scores and added Priority score 61 (100 - mean(45,69,40,0)) and 10 prioritised recommendations consolidated from 32 module findings (#1 mobile_usability drawing on 4 modules, then metadata_quality, lead_capture, cta_effectiveness, trust_signals, contact_paths, then medium/low topics); identical output on the second run (4 scores, 10 recommendations, same leading topic)
 - Live Phase 4 reprocessing (executed, twice for idempotency): `php artisan analysis:reprocess` against the stored books.toscrape.com 20-page crawl produced Campaign Readiness 45, Technical audit 69, Conversion opportunity 40, Lead readiness 0 (correct: the store has no forms or contact links), 8 insights, 7 waste findings, 9 creative items; row counts identical across both runs (3 marketing scores, 10 predictive, 7 waste, 9 creative); spot-checked evidence matches real crawl data (H1 "All products", no viewport meta, no lead forms), confidence high
 - Live Phase 3 reprocessing (executed): `php artisan analysis:reprocess` against the same crawl produced Campaign Readiness 45/100 and Technical audit 69/100 with 8 insights; spot-checked evidence strings match real crawl data, confidence high
@@ -93,7 +104,7 @@ Details in [TESTING.md](TESTING.md).
 
 ## Known bugs
 
-- None open. (Fixed during Phase 2: worker-pool early-exit race in BFS; `WebsiteFactory` ignored explicit `url` overrides; nested-heading arrays crashed callback persistence; fake-host DNS in redirect tests. Fixed during Phase 3: integer division made `$share === 1.0` false for perfect sites, so healthy sites scored "warn" instead of "pass" - shares are now cast to float. Fixed during Phase 4: missing `WasteFinding` import in the waste service; skip behavioural quirk - web module view needed `@include` partials, not anonymous component tags. Fixed during Phase 5: advisor topic slug stripped digits from keys, collapsing distinct unrecognised keys into a single topic.)
+- None open. (Fixed during Phase 2: worker-pool early-exit race in BFS; `WebsiteFactory` ignored explicit `url` overrides; nested-heading arrays crashed callback persistence; fake-host DNS in redirect tests. Fixed during Phase 3: integer division made `$share === 1.0` false for perfect sites, so healthy sites scored "warn" instead of "pass" - shares are now cast to float. Fixed during Phase 4: missing `WasteFinding` import in the waste service; skip behavioural quirk - web module view needed `@include` partials, not anonymous component tags. Fixed during Phase 5: advisor topic slug stripped digits from keys, collapsing distinct unrecognised keys into a single topic. Fixed during Phase 6: `history()` initially returned `technical_audit: null` because the audit score lives in `technical_audits`, not `marketing_scores`; it now reads `TechnicalAudit` rows directly.)
 - One transient, non-reproducible failure occurred in a single isolated Feature-suite run during Phase 3 development (test not captured before re-run); 6 subsequent full/isolated runs all pass. Being watched; no code suspect identified yet.
 
 ## Known limitations (honest)

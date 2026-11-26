@@ -64,3 +64,13 @@ Added:
 - UI: AI Advisor screen (priority score + module score cards, executive summary, prioritised action plan) on a new AI Advisor tab; campaign page links to it; the "coming in Phase 5" placeholder span was removed
 - Tests: 14 new (206 Laravel total, 751 assertions) + 21 crawler node tests, all passing; live reprocess on the stored books.toscrape.com crawl: Priority score 61, 32 module findings consolidated into 10 prioritised recommendations (top: mobile_usability drawing on 4 modules); identical output on rerun
 - Fixed in this phase (caught by the new cap test): topic-distinct keys were collapsed into one topic because the slug regex stripped digits
+
+## Phase 6 - Reports, Charts and Historical Comparison
+
+- `ReportGenerationService` (v1.0): snapshot builder over a completed analysis (five module scores, campaign criteria, technical checks, advisor action plan, all module findings, crawl stats, disclaimers); deterministic PDF rendering via **dompdf** (real PDF-1.7 files) and CSV via fputcsv with clearly-labelled sections; report metadata + the full snapshot persisted in the new `reports` table (uuid, format pdf|csv, status, path, filename, size_bytes, payload JSON, generator, version)
+- Download resilience: `ensureFile` regenerates a missing file deterministically from the stored snapshot (ephemeral-filesystem safety for Render free tier); binary-expired reports flip to `expired` with an honest message instead of pretending to download
+- Historical comparison: `history()` returns the last 12 completed jobs chronologically with all five module scores (technical audit score pulled from `technical_audits`); rendered as a Chart.js line chart (local, vendored at `public/vendor/chart.umd.min.js`, no CDN dependency) plus an on-page score-history list
+- Dependency: `dompdf/dompdf ^3.1` added (PDF generation is real, no paid services)
+- API: `GET/POST /api/websites/{id}/reports` (list latest 25 / generate with FormRequest-validated format pdf|csv, POST rate-limited 20/min, honest 422 without a completed analysis), `GET /api/reports/{id}` (metadata), `GET /api/reports/{id}/download` (streams with correct content type)
+- Web: Reports screen with generate buttons, Chart.js score-history chart, stored-reports table with downloads and honest empty states; new Reports tab; ownership enforced on every endpoint
+- Tests: 19 new (225 Laravel total, 843 assertions) + 21 crawler node tests, all passing; live verification against the books.toscrape.com 20-page analysis produced a valid 14 KB PDF and a 85-line CSV containing the real module scores (45/69/40/0/61) and disclaimers

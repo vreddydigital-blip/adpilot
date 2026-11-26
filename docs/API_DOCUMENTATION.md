@@ -109,9 +109,20 @@ Requires Sanctum auth; ownership enforced via the website policy; throttle 60/mi
 - `breakdown` = `{ label, engine, engine_note, methodology, summary, scores, priorities, disclaimer }`; `engine_note` states that the rule-based engine is not a large language model and not a validated ML prediction
 - `recommendations[]` = ordered rows (priority high→low then position) with `recommendation_key`, `priority`, `title`, `rationale`, `evidence[]`, `action`, `effort`, `expected_impact`, `confidence`, `module_source[]`, `position`, `source` (`rule_based_v1`)
 
+### Reports endpoints (Phase 6)
+
+Requires Sanctum auth; ownership enforced per report (`user_id`) and via the website policy; formats `pdf` (dompdf) or `csv` (fputcsv).
+
+- `GET /api/websites/{id}/reports` - the requesting user's 25 latest reports for the website (metadata only: id, uuid, title, format, status, size_bytes, analysis_job, generator, version, download_url, created_at); `200` with an empty list when none exist
+- `POST /api/websites/{id}/reports` `{ format: pdf|csv }` - snapshots the latest completed analysis into a stored report; `201` with `{ report: metadata, message }`; rate-limited 20/min; **422** with `message: "No completed analysis yet. Reports require a completed crawl; run an analysis first."` without one; `422` validation errors for other formats; **500** with audit entry `report.generation_failed` on renderer failure
+- `GET /api/reports/{report}` - single report metadata; `403` for non-owners
+- `GET /api/reports/{report}/download` - streams the file (`application/pdf` / `text/csv; charset=UTF-8`, attachment); a missing file is deterministically regenerated from the stored snapshot; **404** with an honest message when the payload no longer allows regeneration; rate-limited 30/min
+
+All report content is derived from stored crawl evidence and carries the heuristic/no-real-metrics disclaimer.
+
 ## Planned endpoints (later phases)
 
-`/api/websites/{id}/overview`, `/api/reports/{id}` (Phase 6), `/api/internal/crawler-callback` (implemented - see below).
+`/api/websites/{id}/overview`, `/api/internal/crawler-callback` (implemented - see below), integration-settings endpoints (Phase 7).
 
 ### GET /api/websites/{id}/campaign-intelligence (Phase 3)
 

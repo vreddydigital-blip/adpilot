@@ -1,15 +1,15 @@
 # TESTING
 
-Last executed: Phase 5 completion. Suites: `php artisan test` (SQLite in-memory) for the Laravel app and `node --test` for the crawler package.
+Last executed: Phase 6 completion. Suites: `php artisan test` (SQLite in-memory) for the Laravel app and `node --test` for the crawler package.
 
 ## Results
 
 | Suite | Tests | Assertions | Result |
 |---|---|---|---|
-| Laravel Feature | 98 | 364 | all passing |
-| Laravel Unit | 108 | 387 | all passing |
+| Laravel Feature | 115 | 414 | all passing |
+| Laravel Unit | 110 | 429 | all passing |
 | Crawler (node:test) | 21 | 21 node asserts | all passing |
-| **Total** | **227** | **751 assertions + crawler asserts** | **all passed, 0 failed** |
+| **Total** | **246** | **843 assertions + crawler asserts** | **all passed, 0 failed** |
 
 Anomaly log: during Phase 3 development, one isolated Feature-suite run reported 1 failed / 68 passed; the failing test was not captured before re-run and the failure was never reproduced in 6 subsequent full and isolated runs (all pass). Being watched; no code suspect identified.
 
@@ -23,6 +23,8 @@ Breakdown:
 - `tests/Feature/ProfileTest.php` - profile flows (Breeze).
 - `tests/Feature/ModuleIntelligenceApiTest.php` (16) - Phase 4 module endpoints + Phase 5 advisor endpoint (see below).
 - `tests/Feature/WebsiteModulePagesTest.php` (11) - Phase 4 module web pages + Phase 5 advisor page (see below).
+- `tests/Unit/Reports/ReportGenerationServiceTest.php` (7) - Phase 6 reports (see below).
+- `tests/Feature/ReportApiTest.php` (7) + `tests/Feature/ReportPagesTest.php` (5) - Phase 6 report API and web pages (see below).
 
 ## Coverage gaps (to close in later phases)
 
@@ -102,3 +104,16 @@ Live (executed during Phase 5, outside the test runner):
 - `analysis:reprocess` re-run on the stored books.toscrape.com 20-page crawl: previous scores unchanged (Campaign 45, Technical 69, Opportunity 40, Lead 0), Priority score 61 (100 - mean(45,69,40,0)), 32 module findings consolidated into 10 prioritised recommendations (#1 mobile_usability spanning wasted_spend+campaign_readiness+technical_audit+conversion_opportunity, #2 metadata_quality, #3 lead_capture, #4 cta_effectiveness, #5 trust_signals, #6 contact_paths, then medium/low topics); summary and disclaimers verified verbatim.
 - Idempotency re-verified live: a second identical reprocess kept 4 scores + 10 recommendations with the same leading topic.
 - Bug found by these tests: the advisor topic slug stripped digits from keys, collapsing distinct unrecognised keys (`finding_1`..`finding_12`) into one topic; the topic regex now keeps digits/underscores.
+
+## Phase 6 additions
+
+Laravel (`php artisan test`, all passing; 225 tests / 843 assertions total for the app: Feature 115/414, Unit 110/429):
+
+- `tests/Unit/Reports/ReportGenerationServiceTest.php` (7): snapshot contains the real URL/job/pages, all five module scores, recommendations, findings, checks and the no-real-metrics disclaimer; PDF reports are real files (status ready, dompdf generator, > 1 KB, `%PDF-` magic, payload stored); CSV reports contain the section headers, real score rows and disclaimers; generation refuses a pending/failed job (`completed analysis required`) and unknown formats (`xlsx`); `ensureFile` deterministically regenerates a lost file from the stored payload and keeps status ready; history orders two completed jobs chronologically and returns all five module scores non-null.
+- `tests/Feature/ReportApiTest.php` (7): owner generates a PDF (`201` with metadata incl. job uuid, DB row ready) and lists/shows metadata; PDF download streams with `application/pdf` + `%PDF-` content; CSV download streams with `text/csv; charset=UTF-8` + section content; generation without a completed analysis returns the honest 422 message and stores nothing; cross-user 403 on generate/show/download (nothing extra stored); 401 unauthenticated on store + download; format validation rejects `xlsx`.
+- `tests/Feature/ReportPagesTest.php` (5): the Reports screen renders generate buttons, the Chart.js score-history card (vendored `chart.umd.min.js`, honest "heuristic crawl-evidence scores" label) and the stored-reports block with empty state; honest empty state without a completed analysis; owner generates via form (redirect + success message incl. job uuid) and downloads the CSV; page + download 403 for other users; unauthenticated redirect to login.
+
+Live (executed during Phase 6, outside the test runner):
+
+- `ReportGenerationService` executed against the real books.toscrape.com 20-page analysis: PDF 14,047 bytes with `%PDF-` magic; CSV 85 lines containing the real module scores (`technical_audit,69 / campaign_readiness,45 / conversion_opportunity,40 / lead_intelligence,0 / marketing_advisor,61`, methodology rows incl. `rule_based`), section headers and the closing heuristic/no-real-metrics disclaimer; `history()` returned all five scores with `technical_audit: 69` resolved from `technical_audits`.
+- Fixed during testing: `history()` initially returned `technical_audit: null` because the audit score lives in `technical_audits`, not `marketing_scores`; it now reads `TechnicalAudit` rows directly (live history shows `technical_audit: 69`, and reports/CSV rows carry the audit methodology).

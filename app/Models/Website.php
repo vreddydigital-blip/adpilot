@@ -55,4 +55,9 @@ class Website extends Model
     {
         return $this->hasMany(BudgetScenario::class);
     }
+
+    public function reports(): HasMany
+    {
+        return $this->hasMany(Report::class);
+    }
 }

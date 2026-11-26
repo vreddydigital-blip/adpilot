@@ -138,9 +138,14 @@ Every result row carries the disclaimer: "Deterministic simulation from your sta
 
 `AnalysisPipeline::run(job)`: refuses jobs with no crawled pages; otherwise, inside one database transaction, persists `technical_audits` (unique per job) and `marketing_scores` for `campaign_readiness`, `conversion_opportunity`, `lead_intelligence` and `marketing_advisor` (unique per job+module, updated in place) and replaces the job's `campaign_insights`, `predictive_insights`, `lead_insights`, `waste_findings`, `creative_insights` and `recommendations` rows (delete-then-insert), so re-running `analysis:reprocess` never duplicates rows (verified live across Phases 3-5: consecutive reprocesses on a 20-page crawl produced identical scores and identical row counts). The advisor always runs last so it reads the other modules' persisted results. A pipeline exception is caught, audited (`analysis_pipeline.failed`) and never marks the crawl failed - crawl results are already persisted and remain usable.
 
+### ReportGenerationService (implemented in Phase 6)
+
+- **Snapshot**: deterministic projection of a completed analysis - website/job metadata, the five module scores (technical audit from `technical_audits`, the rest from `marketing_scores` with methodology/version), campaign-readiness criteria, technical checks, every module finding (campaign/predictive/lead/waste with module, priority, title, recommendation), the prioritised advisor action plan and the standard disclaimer. Persisted as the `reports.payload` JSON, so downloads remain reproducible even on an ephemeral filesystem (`ensureFile` regenerates the file from the stored snapshot) and re-download never silently recrawles anything.
+- **PDF**: dompdf renders a print layout (module score table, criteria, checks, action plan, up to 30 findings, disclaimers; real PDF-1.7 output). **CSV**: fputcsv with `SECTION` header rows (module scores / criteria / checks / advisor recommendations / findings / disclaimer). Neither format ever contains real advertising metrics; both state the heuristic disclaimer.
+- **Historical comparison**: `history()` returns the last 12 completed jobs chronologically with all five module scores; the Reports screen renders it with a locally-vendored Chart.js line chart explicitly labelled as heuristic crawl-evidence scores.
+
 ## Planned algorithms (documented in later phases)
 
-- Phase 6: report generation over persisted module results (charts, PDF/CSV exports, historical comparison).
 - Later phases: performance_audits once Lighthouse/PageSpeed data is available; a real ML advisor only when labelled conversion data exists (until then the rule-based engine remains the sole advisor).
 
 ## Fabrication policy

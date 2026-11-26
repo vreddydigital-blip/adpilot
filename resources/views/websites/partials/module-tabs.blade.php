@@ -7,6 +7,7 @@
         'lead' => ['label' => 'Lead Intelligence', 'route' => 'websites.lead'],
         'creative' => ['label' => 'Ad Creative', 'route' => 'websites.creative'],
         'advisor' => ['label' => 'AI Advisor', 'route' => 'websites.advisor'],
+        'reports' => ['label' => 'Reports', 'route' => 'websites.reports'],
     ];
 @endphp
 <nav class="flex flex-wrap gap-2" aria-label="Intelligence modules">
