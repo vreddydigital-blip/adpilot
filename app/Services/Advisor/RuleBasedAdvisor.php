@@ -86,7 +86,7 @@ class RuleBasedAdvisor implements AiProvider
                 : 'Resolve: '.$top['title'];
 
             $recommendations[] = [
-                'recommendation_key' => $topic,
+                'recommendation_key' => mb_substr($topic, 0, 60),
                 'priority' => $group['priority'],
                 'title' => $top['title'],
                 'rationale' => count($group['items']).' cross-module finding(s) consolidated from: '.implode(', ', $modules).'.',
@@ -132,7 +132,7 @@ class RuleBasedAdvisor implements AiProvider
 
         $clean = preg_replace('/[^a-z0-9_]/', '', mb_strtolower($key));
 
-        return $clean === null || $clean === '' ? 'other_general' : 'other_'.$clean;
+        return $clean === null || $clean === '' ? 'other_general' : 'other_'.mb_substr($clean, 0, 45);
     }
 
     private function rankings(array $priorities): array
