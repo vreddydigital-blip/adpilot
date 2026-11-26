@@ -15,7 +15,7 @@ Route::post('/internal/crawler-callback', [CrawlerCallbackController::class, 'ha
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/user', fn (\Illuminate\Http\Request $request) => $request->user());
 
-    Route::apiResource('projects', ProjectApiController::class)
+    Route::apiResource('projects', ProjectApiController::class)->names('api.projects')
         ->only(['index', 'store', 'show', 'update', 'destroy']);
 
     Route::post('/websites', [WebsiteApiController::class, 'store']);
