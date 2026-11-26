@@ -97,6 +97,7 @@ async function crawlPlaywright(targetUrl, options = {}) {
 
         if (pages.length < maxPages) {
           pages.push(parsed);
+          process.stderr.write(`[crawl-playwright] page ${pages.length}/${maxPages} ${url} links=${parsed.links.length} queue=${queue.length}\n`);
           for (const link of parsed.links) {
             const key = normalizeQueueKey(link);
             if (!key || queued.has(key) || !key.startsWith(targetOrigin)) continue;
@@ -109,6 +110,7 @@ async function crawlPlaywright(targetUrl, options = {}) {
         }
       } catch (err) {
         recordError(url, err.code || 'playwright_error', err.message);
+        process.stderr.write(`[crawl-playwright] error ${url} ${err.code || 'playwright_error'}: ${String(err.message).slice(0, 200)}\n`);
       } finally {
         if (page) {
           await page.close().catch(() => {});

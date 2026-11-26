@@ -111,6 +111,7 @@ async function crawlHttp(targetUrl, options = {}) {
 
         if (pages.length < maxPages) {
           pages.push(sanitizePage(page));
+          process.stderr.write(`[crawl-http] page ${pages.length}/${maxPages} ${url} links=${page.links.length} queue=${queue.length}\n`);
           for (const link of page.links) {
             const key = normalizeQueueKey(link);
             if (!key || queued.has(key) || !key.startsWith(targetOrigin)) continue;
@@ -126,6 +127,7 @@ async function crawlHttp(targetUrl, options = {}) {
       }
     } catch (err) {
       recordError(url, err.code || 'crawl_error', err.message);
+      process.stderr.write(`[crawl-http] error ${url} ${err.code || 'crawl_error'}: ${String(err.message).slice(0, 200)}\n`);
       if (err instanceof CrawlDeadline) throw err;
     }
   };
