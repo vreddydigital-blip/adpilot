@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AnalysisJobApiController;
 use App\Http\Controllers\Api\CrawlerCallbackController;
+use App\Http\Controllers\Api\IntegrationApiController;
 use App\Http\Controllers\Api\ModuleIntelligenceApiController;
 use App\Http\Controllers\Api\ProjectApiController;
 use App\Http\Controllers\Api\ReportApiController;
@@ -56,4 +57,11 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     Route::get('/analysis-jobs/{analysis_job}', [AnalysisJobApiController::class, 'show'])
         ->middleware('throttle:60,1');
+
+    Route::get('/integrations', [IntegrationApiController::class, 'index'])
+        ->middleware('throttle:60,1');
+    Route::put('/integrations/{provider}', [IntegrationApiController::class, 'save'])
+        ->middleware('throttle:20,1');
+    Route::delete('/integrations/{provider}', [IntegrationApiController::class, 'destroy'])
+        ->middleware('throttle:20,1');
 });

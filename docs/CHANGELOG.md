@@ -74,3 +74,13 @@ Added:
 - API: `GET/POST /api/websites/{id}/reports` (list latest 25 / generate with FormRequest-validated format pdf|csv, POST rate-limited 20/min, honest 422 without a completed analysis), `GET /api/reports/{id}` (metadata), `GET /api/reports/{id}/download` (streams with correct content type)
 - Web: Reports screen with generate buttons, Chart.js score-history chart, stored-reports table with downloads and honest empty states; new Reports tab; ownership enforced on every endpoint
 - Tests: 19 new (225 Laravel total, 843 assertions) + 21 crawler node tests, all passing; live verification against the books.toscrape.com 20-page analysis produced a valid 14 KB PDF and a 85-line CSV containing the real module scores (45/69/40/0/61) and disclaimers
+
+
+## Phase 7 - Security/QA audit and integration settings
+
+- Security audit executed across the whole codebase: authorization policy coverage, mass assignment (`$fillable` on all models), unauthenticated access to Sanctum routes, crawler-callback HMAC hardness, SSRF defenses, session cookie defaults, debug-mode guidance - findings recorded in `docs/SECURITY.md`
+- Fixes: global `SecurityHeaders` middleware (nosniff, frame-deny, referrer policy, permissions policy on every response incl. API and `/up`); `tests/Feature/ApiTest.php` moved to `tests/Feature/Api/ApiTest.php` fixing a PSR-4 autoload violation
+- Dependencies: `composer update` moved `symfony/http-kernel`, `symfony/mailer`, `symfony/routing` to v7.4.24 - `composer audit` is now clean (was 5 advisories)
+- Integration settings (honest by design): `config/integrations.php` catalogue (Google Ads, Meta Ads, GA4, Google Search Console), `integration_settings` table (migrated), `IntegrationSetting` model with `encrypted:json` credentials, API (`GET/PUT/DELETE /api/integrations...`) and a new Integrations screen with sidebar link; saving credentials stores them encrypted and explicitly does **not** connect to anything - statuses are `not_connected` / `credentials_saved` only, flagged `live_connection: false`, `data_fetched: false`
+- `performance_audits`: decision recorded - deferred until a real Lighthouse/PageSpeed-style data source exists; no heuristic stand-in will be built
+- Tests: 16 new (241 Laravel total, 924 assertions: Feature 126/495 + Unit 115/429) + 21 crawler node tests, all passing

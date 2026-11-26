@@ -39,3 +39,24 @@ Report suspected security issues in this portfolio project by opening a private 
 - `GET /api/websites/{id}/campaign-intelligence` lives inside the `auth:sanctum` group and authorizes through the existing website ownership policy (403 for other users, 401 unauthenticated); the token-authenticated feature tests cover all three cases.
 - The analysis pipeline only consumes already-stored crawl rows; it never accepts external payload data beyond the validated crawler callback, so no trust boundary is crossed by scoring.
 - Pipeline failures are audited (`analysis_pipeline.failed`) and cannot upgrade a crawl to completed retroactively - the callback flow itself still controls the job lifecycle; the pipeline only ever marks a job completed after results from an already-successful crawl persist.
+
+
+## Phase 7 - security and QA audit
+
+Findings fixed in this phase:
+
+- **PSR-4 violation** - `tests/Feature/ApiTest.php` declared the namespace `Tests\Feature\Api` while living in `tests/Feature/`; moved to `tests/Feature/Api/ApiTest.php` (no behaviour change, composer autoload no longer skips the class).
+- **Missing security response headers** - added a global `SecurityHeaders` middleware (registered in `bootstrap/app.php`) that sets `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin` and `Permissions-Policy: camera=(), microphone=(), geolocation=()` on every response (web, SPA, JSON API and the `/up` health endpoint); covered by `SecurityHeadersTest`.
+- **Dependency advisories** - `composer update symfony/http-kernel symfony/mailer symfony/routing --with-all-dependencies` moved all three packages to v7.4.24; `composer audit` now reports zero advisories (fixes CVE-2026-133743, CVE-2026-133751, CVE-2026-133755 and the routing advisory).
+
+Full audit pass (all items verified, none faked):
+
+- **Authorization** - every controller action on a user-owned resource goes through `ProjectPolicy`/`WebsitePolicy`/`AnalysisJobPolicy` or an explicit owner check (`abort_unless(...)`, e.g. reports and budget scenarios); list endpoints always filter by `user_id`; object-level 403 behaviour is covered by feature tests across projects, websites, modules, budget scenarios and reports.
+- **Mass assignment** - all 19 models declare `$fillable`; no `unguard()` anywhere.
+- **Unauthenticated access** - the Sanctum group rejects `401` (covered for projects, modules, reports, integrations); the only unauthenticated write endpoint is the HMAC-signed crawler callback.
+- **Crawler callback** - HMAC over `timestamp.rawBody` with `hash_equals`, 300 s window, nonce replay cache, 20-page strict validator, host-mismatch rejection, terminal 409 guard, rejections audited; 8 dedicated test cases in `CrawlerCallbackFlowTest`.
+- **SSRF** - URL validator at submission (scheme allow-list, credential stripping, host deny-list, literal-IP filtering) plus crawler-runtime DNS/redirect/connect IP checks (SSRF blocks verified live in Phase 2).
+- **Integration credentials (new in Phase 7)** - stored with Laravel's `encrypted:json` cast (at-rest encryption via `APP_KEY`); never returned in any response (only field names are echoed back as "saved fields"); audit logs contain field names only, asserted by test; unlisted credential field names are stripped server-side before storage; outcomes audited as `integration.credentials_saved`/`credentials_removed`/`save_failed`. Statuses are honest: saving credentials creates **no** live connection and no data is fetched.
+- **Sessions** - `http_only` and `same_site=lax` defaults in place; `SESSION_SECURE_COOKIE=true` documented for HTTPS deployments in DEPLOYMENT.md.
+- **Debug exposure** - `APP_DEBUG=true` in `.env.example` is local-only; the deployment checklist requires `APP_DEBUG=false` in production.
+- **Dependency surface** - `composer audit` clean after the Phase 7 update; risk profile reviewed: only the transitive Symfony components of Laravel 12, dompdf (used with `isRemoteEnabled=false`) and vetted first-party packages.

@@ -28,6 +28,7 @@
                         <x-sidebar-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">Overview</x-sidebar-link>
                         <x-sidebar-link :href="route('projects.index')" :active="request()->routeIs('projects.*')">Projects</x-sidebar-link>
                         <x-sidebar-link :href="route('profile.edit')" :active="request()->routeIs('profile.*')">Settings</x-sidebar-link>
+                        <x-sidebar-link :href="route('integrations.index')" :active="request()->routeIs('integrations.*')">Integrations</x-sidebar-link>
                     </nav>
                     <div class="px-6 py-4 text-xs text-slate-400 border-t border-slate-800 mt-4">
                         Portfolio build · Phase 5 (reports in Phase 6)
@@ -46,6 +47,7 @@
                         <x-sidebar-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">Overview</x-sidebar-link>
                         <x-sidebar-link :href="route('projects.index')" :active="request()->routeIs('projects.*')">Projects</x-sidebar-link>
                         <x-sidebar-link :href="route('profile.edit')" :active="request()->routeIs('profile.*')">Settings</x-sidebar-link>
+                        <x-sidebar-link :href="route('integrations.index')" :active="request()->routeIs('integrations.*')">Integrations</x-sidebar-link>
                     </nav>
                     <div class="px-6 py-4 text-xs text-slate-400 border-t border-slate-800 mt-auto">
                         Portfolio build · Phase 5 (reports in Phase 6)

@@ -3,6 +3,7 @@
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\IntegrationController;
 use App\Http\Controllers\WebsiteController;
 use App\Http\Controllers\WebsiteModuleController;
 use Illuminate\Support\Facades\Route;
@@ -36,6 +37,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/websites/{website}/reports', [WebsiteModuleController::class, 'reports'])->name('websites.reports');
     Route::post('/websites/{website}/reports', [WebsiteModuleController::class, 'storeReport'])->name('websites.reports.store');
     Route::get('/websites/{website}/reports/{report}/download', [WebsiteModuleController::class, 'downloadReport'])->name('websites.reports.download');
+
+    Route::get('/integrations', [IntegrationController::class, 'index'])->name('integrations.index');
+    Route::post('/integrations/{provider}', [IntegrationController::class, 'save'])->name('integrations.save');
+    Route::delete('/integrations/{provider}', [IntegrationController::class, 'destroy'])->name('integrations.destroy');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

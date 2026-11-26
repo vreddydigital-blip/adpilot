@@ -34,7 +34,7 @@ Browser
 | `App\Models\AuditLog` | security-relevant event logging |
 | Policies (`ProjectPolicy`, `WebsitePolicy`, `AnalysisJobPolicy`) | ownership authorization for every action |
 
-Planned services (Phase 7): security/QA audit tooling, integration settings.
+Implemented in Phase 7: global `SecurityHeaders` middleware (bootstrap middleware stack) and the integration-settings layer (`IntegrationSetting` model + `IntegrationController`/`IntegrationApiController`, catalogue in `config/integrations.php`). The `performance_audits` service/table remains deferred (decision in Phase 7): until a real Lighthouse/PageSpeed-style source exists no substitute will be built.
 
 ## Data integrity principles
 

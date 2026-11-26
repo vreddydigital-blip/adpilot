@@ -120,9 +120,25 @@ Requires Sanctum auth; ownership enforced per report (`user_id`) and via the web
 
 All report content is derived from stored crawl evidence and carries the heuristic/no-real-metrics disclaimer.
 
+## Integration endpoints (Phase 7)
+
+All require Sanctum auth. The integration layer stores credentials only - there is no live provider connection, `live_connection` and `data_fetched` are always `false`, and every response carries the no-fabrication note from `config/integrations.php`.
+
+### GET /api/integrations
+
+Returns the provider catalogue merged with the authenticated user's stored state: `providers[]` (provider, label, description, credential_fields, provides, status `not_connected|credentials_saved`, `credentials_saved`, `live_connection: false`, `data_fetched: false`), `note`, `credential_fields` (names of stored fields only - values are never returned).
+
+### PUT /api/integrations/{provider}
+
+Body: `{"credentials": {<field>: <value>, ...}}` (field names restricted to the provider's catalogue entry; unknown fields dropped server-side; each value max 500 chars). Stores credentials with Laravel's `encrypted:json` cast, sets status `credentials_saved`, audits `integration.credentials_saved` with field names only. `201` on first save, `200` on update; blank/omitted fields keep previously stored values. Honest message: "Credentials stored encrypted. No live connection was made and no advertising data is fetched yet."
+
+### DELETE /api/integrations/{provider}
+
+Clears stored credentials, resets status to `not_connected`, audits `integration.credentials_removed`. `404` when nothing is stored for the provider.
+
 ## Planned endpoints (later phases)
 
-`/api/websites/{id}/overview`, `/api/internal/crawler-callback` (implemented - see below), integration-settings endpoints (Phase 7).
+`/api/websites/{id}/overview`, `/api/internal/crawler-callback` (implemented - see below).
 
 ### GET /api/websites/{id}/campaign-intelligence (Phase 3)
 

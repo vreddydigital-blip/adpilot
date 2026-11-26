@@ -232,9 +232,19 @@ Indexes: (`analysis_job_id`, `priority`), (`website_id`, `priority`), index `web
 
 Indexes: (`user_id`, `created_at`), (`website_id`, `created_at`), index `analysis_job_id`. Files live on the local disk; with an ephemeral filesystem the `payload` allows deterministic regeneration on download.
 
+## Integration table (created in Phase 7)
+
+`integration_settings` (migrated, `2026_01_01_000700_create_integration_settings_table.php`):
+- `user_id` FK -> `users`, cascade delete
+- `provider` string(40) (catalogue keys: `google_ads`, `meta_ads`, `google_analytics`, `google_search_console`)
+- `status` string(20) default `not_connected` (only `not_connected` | `credentials_saved` exist - no live connection is made in Phase 7)
+- `credentials` text nullable - Laravel `encrypted:json` cast (at-rest encryption; readable only with the app's `APP_KEY`)
+- `settings` json nullable
+- `connected_at` / `last_synced_at` timestamps nullable (unused until a real connector lands)
+- timestamps; unique (`user_id`, `provider`); index `status`
+
 ## Planned tables (created in later phases)
 
-technical: `performance_audits` (deferred until a Lighthouse/PageSpeed-like source exists)
-admin: `integration_settings`
+technical: `performance_audits` - decision recorded in Phase 7: deferred until a real Lighthouse/PageSpeed-style data source exists; no heuristic stand-in will be built
 
 TiDB compatibility notes: the schema uses standard migrations; website URLs exceed TiDB index-key limits only in composite unique constraints, which is why the 64-char `url_hash` is used for the unique key.

@@ -1,10 +1,10 @@
 # DEVELOPMENT_STATUS
 
-Last updated: Phase 6 completion.
+Last updated: Phase 7 completion.
 
 ## Current phase
 
-**PHASE 6 - REPORTS, CHARTS AND HISTORICAL COMPARISON (complete).** Phases 7-8 not started.
+**PHASE 7 - SECURITY/QA AUDIT + INTEGRATION SETTINGS (complete).** Phase 8 not started.
 
 Deployment target decision: **Render (free web service) + TiDB Cloud Starter + GitHub Actions crawler** is the Phase 8 target (user-approved). Hostless remains documented as a fallback.
 
@@ -78,19 +78,28 @@ Deployment target decision: **Render (free web service) + TiDB Cloud Starter + G
 - UI: new Reports tab (8th module tab) with pdf/csv generate buttons, a Chart.js score-history line chart fed by embedded history data (labelled "Not a marketing performance chart - all values are heuristic crawl-evidence scores"), and a stored-reports table with download links and an ephemeral-filesystem note
 - Tests: 19 new tests (225 total for the Laravel app; Feature 115/414, Unit 110/429): 7 unit (snapshot contents, PDF magic bytes, CSV sections, pending-job/format guards, ensureFile regeneration, two-job chronological history), 7 API feature (store/index/show/downloads, 422 without a completed analysis, object-level 403 + 401, format validation), 5 web-page feature (screen render, empty state, csv generation flash + download, cross-user 403, auth redirect)
 - Live verification: generated PDF (14,047 bytes with real `%PDF-` magic) and CSV (85 lines) from the real books.toscrape.com 20-page analysis; the CSV carries the real scores technical_audit 69 / campaign_readiness 45 / conversion_opportunity 40 / lead_intelligence 0 / marketing_advisor 61 with methodology rows (incl. `rule_based`); `history()` returns all five scores; regeneration after file deletion via `ensureFile()` verified
-- Watched item: `composer audit` reports 5 advisories in transitive Symfony packages; a `composer update` pass is planned in Phase 7
+
+### Phase 7 - Security/QA audit + integration settings (backend + API + UI)
+- Security/QA audit executed across the codebase; findings and fixes recorded in `docs/SECURITY.md`: authorization policy coverage everywhere (policies + explicit owner checks), `$fillable` on all 19 models, Sanctum 401 walls, HMAC crawler-callback hardness (8 test cases), SSRF defenses (validator + crawler-runtime checks, live-verified in Phase 2), session cookie defaults, debug-mode guidance
+- Fixes from the audit: global `SecurityHeaders` middleware (X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy on every response incl. API + `/up`); `tests/Feature/ApiTest.php` moved to `tests/Feature/Api/ApiTest.php` (PSR-4 fix)
+- Dependencies: `composer update symfony/http-kernel symfony/mailer symfony/routing` -> all three at v7.4.24; `composer audit` now reports zero advisories
+- Integration settings (honest by design): `config/integrations.php` catalogue (Google Ads, Meta Ads, GA4, Search Console), `integration_settings` table (migrated), `IntegrationSetting` model with `encrypted:json` credentials, API (`GET /api/integrations`, `PUT /api/integrations/{provider}`, `DELETE /api/integrations/{provider}`) and an Integrations screen in the sidebar; credentials are stored encrypted and never echoed back or logged; statuses only `not_connected` / `credentials_saved` with `live_connection: false`, `data_fetched: false`
+- `performance_audits` decision: deferred until a real Lighthouse/PageSpeed-style data source exists; no heuristic stand-in will be built
+- Tests: 16 new (241 total for the Laravel app; Feature 126/495, Unit 115/429)
 
 ## Incomplete features (planned phases - never faked in UI)
 
 - `performance_audits` table deferred until a Lighthouse/PageSpeed or similar data source is available (Phase 2 crawl timing is used as a relative indicator inside the technical audit in the meantime)
 - External AI provider (LLM) for the advisor: interface + config are ready, but nothing external calls any AI service today; the shipped engine is the deterministic rule-based one
-- Phase 7: security/QA audit, integration settings, Phase 7 cleanup (`composer update` for transitive Symfony advisories); `performance_audits` stays deferred until a real data source exists
+- Integration execution: credential storage exists, but no provider connector fetches real data yet (nothing is fabricated in the meantime; advertised metrics stay marked as requiring integrations)
+- `performance_audits` stays deferred until a real Lighthouse/PageSpeed-style data source exists (Phase 7 decision: no heuristic stand-in)
 - Phase 8: free hosting deployment (Render + TiDB + GitHub Actions)
 
 ## Tests executed
 
-- Laravel: `php artisan test` - **225 passed, 0 failed** (843 assertions), SQLite in-memory, PHP 8.3.22, Laravel 12 (Unit: 110/429, Feature: 115/414)
+- Laravel: `php artisan test` - **241 passed, 0 failed** (924 assertions), SQLite in-memory, PHP 8.3.22, Laravel 12 (Unit: 115/429, Feature: 126/495)
 - Crawler: `node --test crawler/test/crawler.test.js` - **21 passed, 0 failed**, Node v22.23.5
+- Live Phase 7 verification (executed): `composer audit` clean after the symfony update; security headers present on web/API/health responses (also asserted by tests); integration settings exercised by HTTP tests including encryption-at-rest (raw DB rows contain no plaintext credential), audit-log credential-leak assertions and blank-field-keeps-old-value behaviour
 - Live Phase 6 report generation (executed): PDF and CSV generated via the real UI-equivalent service path against the stored books.toscrape.com 20-page analysis - PDF 14,047 bytes starting with `%PDF-`, CSV 85 lines with the SECTION layout, the five real score rows (technical_audit 69, campaign_readiness 45, conversion_opportunity 40, lead_intelligence 0, marketing_advisor 61), methodology rows (`rule_based` advisor) and the honesty disclaimer; score history returned all five modules for the completed jobs; `ensureFile()` regenerated a report after its stored file was deleted; Report generation is idempotent-safe (new report row per request, snapshot reproducible)
 - Live Phase 5 advisor reprocessing (executed, twice for idempotency): `analysis:reprocess` against the stored books.toscrape.com 20-page crawl kept all previous scores and added Priority score 61 (100 - mean(45,69,40,0)) and 10 prioritised recommendations consolidated from 32 module findings (#1 mobile_usability drawing on 4 modules, then metadata_quality, lead_capture, cta_effectiveness, trust_signals, contact_paths, then medium/low topics); identical output on the second run (4 scores, 10 recommendations, same leading topic)
 - Live Phase 4 reprocessing (executed, twice for idempotency): `php artisan analysis:reprocess` against the stored books.toscrape.com 20-page crawl produced Campaign Readiness 45, Technical audit 69, Conversion opportunity 40, Lead readiness 0 (correct: the store has no forms or contact links), 8 insights, 7 waste findings, 9 creative items; row counts identical across both runs (3 marketing scores, 10 predictive, 7 waste, 9 creative); spot-checked evidence matches real crawl data (H1 "All products", no viewport meta, no lead forms), confidence high
