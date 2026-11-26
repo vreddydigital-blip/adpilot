@@ -8,7 +8,11 @@ use App\Http\Controllers\WebsiteController;
 use App\Http\Controllers\WebsiteModuleController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', fn () => redirect()->route('dashboard'));
+Route::get('/', function () {
+    return auth()->check()
+        ? redirect()->route('dashboard')
+        : view('welcome');
+});
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
