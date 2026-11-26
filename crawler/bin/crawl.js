@@ -105,6 +105,36 @@ function postCallback(callbackUrl, rawBody, headers, timeoutMs = 20000) {
   });
 }
 
+function postCallbackWithRetry(callbackUrl, rawBody, headers, timeoutMs = 45000, attempts = 3) {
+  return new Promise((resolve, reject) => {
+    let attempt = 0;
+    const delays = [0, 10000, 20000];
+    const tryOnce = () => {
+      postCallback(callbackUrl, rawBody, headers, timeoutMs)
+        .then((code) => {
+          if (code >= 200 && code < 300) return resolve(code);
+          if (code >= 500 && attempt < attempts - 1) {
+            attempt += 1;
+            process.stderr.write(`Callback got HTTP ${code}; retrying in ${Math.round(delays[attempt] / 1000)}s.\n`);
+            setTimeout(tryOnce, delays[attempt]);
+            return;
+          }
+          reject(new Error(`Callback responded with HTTP ${code}.`));
+        })
+        .catch((err) => {
+          if (attempt < attempts - 1) {
+            attempt += 1;
+            process.stderr.write(`Callback attempt failed (${err.message}); retrying in ${Math.round(delays[attempt] / 1000)}s.\n`);
+            setTimeout(tryOnce, delays[attempt]);
+            return;
+          }
+          reject(err);
+        });
+    };
+    tryOnce();
+  });
+}
+
 function emit(payload, args) {
   if (args.output) {
     fs.writeFileSync(args.output, JSON.stringify(payload, null, 2));
@@ -161,7 +191,7 @@ async function main() {
       process.exit(1);
     }
     const signed = signPayload(outcome.payload, secret);
-    const statusCode = await postCallback(args['callback-url'], signed.rawBody, signed.headers);
+    const statusCode = await postCallbackWithRetry(args['callback-url'], signed.rawBody, signed.headers);
     process.stderr.write(`Callback responded with HTTP ${statusCode}.\n`);
     process.exit(statusCode >= 200 && statusCode < 300 && outcome.ok ? 0 : 1);
   }

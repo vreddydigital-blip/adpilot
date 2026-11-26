@@ -105,6 +105,7 @@ async function crawlPlaywright(targetUrl, options = {}) {
             if (robotsRules && !isAllowedByRobots(key, robotsRules)) continue;
             queued.add(key);
             depths.set(key, depth + 1);
+            queue.push(key);
             if (queue.length >= maxPages * 5) break;
           }
         }
