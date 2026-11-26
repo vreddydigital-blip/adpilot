@@ -6,7 +6,6 @@ services:
     runtime: docker
     plan: free
     healthCheckPath: /up
-    autoDeploy: true
     envVars:
       - key: APP_ENV
         value: production
@@ -52,4 +51,4 @@ services:
         value: vreddydigital-blip/adpilot
       - key: CRAWLER_CALLBACK_BASE_URL
         sync: false
-    buildContext: .
+    dockerContext: .
