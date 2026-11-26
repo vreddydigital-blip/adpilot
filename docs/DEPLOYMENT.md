@@ -9,7 +9,7 @@
 5. `npm install && npm run build`
 6. `php artisan serve` - open the URL shown in console.
 
-Crawler locally: `php artisan analysis:run-local --all` (see `docs/ARCHITECTURE.md`).
+Crawler locally: `php artisan analysis:run-local --all` and the callback API in `routes/api.php`.
 
 ## Phase 8 - free hosting (Render + TiDB Cloud Starter + GitHub Actions)
 
