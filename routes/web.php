@@ -32,6 +32,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/websites/{website}/wasted-spend', [WebsiteModuleController::class, 'wastedSpend'])->name('websites.wasted-spend');
     Route::get('/websites/{website}/lead-intelligence', [WebsiteModuleController::class, 'lead'])->name('websites.lead');
     Route::get('/websites/{website}/creative', [WebsiteModuleController::class, 'creative'])->name('websites.creative');
+    Route::get('/websites/{website}/advisor', [WebsiteModuleController::class, 'advisor'])->name('websites.advisor');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

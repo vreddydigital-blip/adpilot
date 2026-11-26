@@ -1,9 +1,5 @@
 # CHANGELOG
 
-## Phase 4.1 - Documentation reorganisation
-
-- All 11 required documentation files moved from the repository root into `docs/` (git history preserved); no content changed and doc-to-doc links remain valid
-
 ## Phase 1 - Foundation (2026-11-21)
 
 Added:
@@ -53,3 +49,18 @@ Added:
 - Creative service improvement: brand-identical source text no longer discards the headline candidate (six-word subset is still generated)
 - Tests: 49 new (192 Laravel total, 701 assertions) + 21 crawler node tests, all passing; live verification on the stored books.toscrape.com crawl: Campaign 45, Technical 69, Conversion Opportunity 40, Lead Readiness 0 (correct - no forms or contact methods on that store), 8 insights, 7 waste findings, 9 creative rows, confidence high; second reprocess produced identical scores and row counts, confirming idempotency
 - Fixed in this phase: missing `WasteFinding` import in `WastedSpendAnalysisService` (fatal at pipeline runtime); integer-typed argument in the API score formatter caught by tests
+
+## Phase 4.1 - Documentation reorganisation
+
+- All 11 required documentation files moved from the repository root into `docs/` (git history preserved); no content changed and doc-to-doc links remain valid
+
+## Phase 5 - AI Marketing Advisor (Module 7)
+
+- `AiProvider` interface + default `RuleBasedAdvisor` engine (`rule_based_v1`, bound via `config/advisor.php` -> `ADVISOR_ENGINE`; an external LLM/ML provider can replace it by binding another `AiProvider` implementation) + `MarketingAdvisorService` orchestrator
+- The advisor consolidates already-persisted module results (four module scores, campaign insights, predictive insights, lead insights, waste findings, technical audit fail/warn checks) into a prioritised action plan: keyword-based topic buckets, cross-module de-duplication with merged evidence, priority ranking, cap of 10 recommendations with sequential positions; executive summary with the real score list and explicit heuristic/disclaimer statements
+- Advisor Priority Score (`100 - round(mean(known module scores))`) stored in `marketing_scores` under `module_key = marketing_advisor`, documented as a simple aggregation and never a performance metric; engine_note and disclaimer stored verbatim in the breakdown
+- New `recommendations` table (migrated): recommendation_key, priority, title, rationale, evidence, action, effort, expected_impact, confidence, module_source, position, source; rows replaced on rerun (idempotent, advisor runs last in the pipeline)
+- API: `GET /api/websites/{id}/marketing-advisor` (auth + ownership, honest `data: null` without a completed analysis)
+- UI: AI Advisor screen (priority score + module score cards, executive summary, prioritised action plan) on a new AI Advisor tab; campaign page links to it; the "coming in Phase 5" placeholder span was removed
+- Tests: 14 new (206 Laravel total, 751 assertions) + 21 crawler node tests, all passing; live reprocess on the stored books.toscrape.com crawl: Priority score 61, 32 module findings consolidated into 10 prioritised recommendations (top: mobile_usability drawing on 4 modules); identical output on rerun
+- Fixed in this phase (caught by the new cap test): topic-distinct keys were collapsed into one topic because the slug regex stripped digits

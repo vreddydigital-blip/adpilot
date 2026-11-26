@@ -169,6 +169,34 @@ class WebsiteModulePagesTest extends TestCase
             ->assertSee('Wasted Spend')
             ->assertSee('Lead Intelligence')
             ->assertSee('Ad Creative')
-            ->assertSee('coming in Phase 5', false);
+            ->assertSee('AI Advisor');
+    }
+
+    public function test_advisor_page_renders_action_plan_for_owner(): void
+    {
+        $this->completedJobWithPage();
+
+        $this->actingAs($this->user)->get(route('websites.advisor', $this->website))
+            ->assertOk()
+            ->assertSee('Executive summary')
+            ->assertSee('Priority score')
+            ->assertSee('Prioritised action plan')
+            ->assertSee('not a large language model', false)
+            ->assertSee('AI Advisor');
+    }
+
+    public function test_advisor_page_shows_empty_state_without_completed_analysis(): void
+    {
+        $this->actingAs($this->user)->get(route('websites.advisor', $this->website))
+            ->assertOk()
+            ->assertSee('No completed analysis yet');
+    }
+
+    public function test_advisor_page_is_blocked_for_other_users(): void
+    {
+        $intruder = User::factory()->create();
+
+        $this->actingAs($intruder)->get(route('websites.advisor', $this->website))
+            ->assertForbidden();
     }
 }

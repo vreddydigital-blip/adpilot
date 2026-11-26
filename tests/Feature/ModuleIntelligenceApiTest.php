@@ -232,4 +232,49 @@ class ModuleIntelligenceApiTest extends TestCase
         $response->assertOk();
         $this->assertCount(3, $response->json('channels'));
     }
+
+    public function test_marketing_advisor_returns_engine_and_recommendations_for_owner(): void
+    {
+        $job = $this->completedJobWithPage();
+
+        $response = $this->actingAs($this->user, 'sanctum')
+            ->getJson("/api/websites/{$this->website->id}/marketing-advisor");
+
+        $response->assertOk();
+        $this->assertSame('marketing_advisor', $response->json('module'));
+        $this->assertSame($job->uuid, $response->json('analysis_job.uuid'));
+        $this->assertSame('rule_based_v1', $response->json('data.breakdown.engine'));
+        $this->assertNotNull($response->json('data.score'));
+        $this->assertStringContainsString('not a large language model', (string) $response->json('data.breakdown.engine_note'));
+        $this->assertNotEmpty($response->json('data.recommendations'));
+    }
+
+    public function test_marketing_advisor_returns_honest_empty_state_without_completed_analysis(): void
+    {
+        $response = $this->actingAs($this->user, 'sanctum')
+            ->getJson("/api/websites/{$this->website->id}/marketing-advisor");
+
+        $response->assertOk();
+        $this->assertSame('marketing_advisor', $response->json('module'));
+        $this->assertNull($response->json('data'));
+        $this->assertNull($response->json('analysis_job'));
+        $this->assertStringContainsString('No completed analysis yet', (string) $response->json('message'));
+    }
+
+    public function test_marketing_advisor_is_blocked_for_other_users(): void
+    {
+        $this->completedJobWithPage();
+
+        $intruder = User::factory()->create();
+
+        $this->actingAs($intruder, 'sanctum')
+            ->getJson("/api/websites/{$this->website->id}/marketing-advisor")
+            ->assertForbidden();
+    }
+
+    public function test_marketing_advisor_requires_authentication(): void
+    {
+        $this->getJson("/api/websites/{$this->website->id}/marketing-advisor")
+            ->assertUnauthorized();
+    }
 }

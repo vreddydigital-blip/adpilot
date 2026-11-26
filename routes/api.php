@@ -30,6 +30,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         ->middleware('throttle:60,1');
     Route::get('/websites/{website}/creative-intelligence', [ModuleIntelligenceApiController::class, 'creativeIntelligence'])
         ->middleware('throttle:60,1');
+    Route::get('/websites/{website}/marketing-advisor', [ModuleIntelligenceApiController::class, 'marketingAdvisor'])
+        ->middleware('throttle:60,1');
     Route::get('/budget-channels', [ModuleIntelligenceApiController::class, 'channelFactors'])
         ->middleware('throttle:60,1');
     Route::get('/websites/{website}/budget-intelligence', [ModuleIntelligenceApiController::class, 'budgetScenariosIndex'])

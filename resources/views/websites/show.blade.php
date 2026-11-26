@@ -318,7 +318,8 @@
                     <p class="text-sm text-gray-400 mt-2">No findings recorded — every scored criterion reached its threshold for this job.</p>
                 @endif
                 <p class="text-xs text-gray-500 mt-4">
-                    The AI Marketing Advisor (evidence-based audit and prioritised action plan) is produced by Phase 5.
+                    The AI Marketing Advisor consolidates these findings into a prioritised action plan.
+                    <a href="{{ route('websites.advisor', $website) }}" class="text-sky-400 hover:text-sky-300 underline">Open the AI Advisor</a>
                 </p>
             </div>
         @endif

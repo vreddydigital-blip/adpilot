@@ -9,6 +9,7 @@ use App\Models\CrawledPage;
 use App\Models\LeadInsight;
 use App\Models\MarketingScore;
 use App\Models\PredictiveInsight;
+use App\Models\Recommendation;
 use App\Models\TechnicalAudit;
 use App\Models\WasteFinding;
 use App\Models\Website;
@@ -17,6 +18,7 @@ use App\Services\Analysis\CampaignReadinessService;
 use App\Services\Analysis\ConversionOpportunityService;
 use App\Services\Analysis\CreativeAnalysisService;
 use App\Services\Analysis\LeadReadinessService;
+use App\Services\Analysis\MarketingAdvisorService;
 use App\Services\Analysis\TechnicalAuditService;
 use App\Services\Analysis\WastedSpendAnalysisService;
 use Database\Factories\AnalysisJobFactory;
@@ -104,7 +106,7 @@ class AnalysisPipelineTest extends TestCase
         $after = CampaignInsight::where('analysis_job_id', $this->job->id)->count();
 
         $this->assertSame($first['campaign_score'], $second['campaign_score']);
-        $this->assertSame(3, MarketingScore::where('analysis_job_id', $this->job->id)->count());
+        $this->assertSame(4, MarketingScore::where('analysis_job_id', $this->job->id)->count());
         $this->assertSame(1, TechnicalAudit::where('analysis_job_id', $this->job->id)->count());
         $this->assertSame($before, $after);
     }
@@ -116,13 +118,16 @@ class AnalysisPipelineTest extends TestCase
         $result = $this->pipeline->run($this->job->refresh());
 
         $this->assertTrue($result['ran']);
-        $this->assertSame(3, MarketingScore::where('analysis_job_id', $this->job->id)->count());
+        $this->assertSame(4, MarketingScore::where('analysis_job_id', $this->job->id)->count());
+        $this->assertDatabaseHas('marketing_scores', ['analysis_job_id' => $this->job->id, 'module_key' => 'marketing_advisor']);
         $this->assertDatabaseHas('marketing_scores', ['analysis_job_id' => $this->job->id, 'module_key' => 'campaign_readiness']);
         $this->assertDatabaseHas('marketing_scores', ['analysis_job_id' => $this->job->id, 'module_key' => 'conversion_opportunity']);
         $this->assertDatabaseHas('marketing_scores', ['analysis_job_id' => $this->job->id, 'module_key' => 'lead_intelligence']);
         $this->assertGreaterThan(0, PredictiveInsight::where('analysis_job_id', $this->job->id)->count());
         $this->assertGreaterThan(0, LeadInsight::where('analysis_job_id', $this->job->id)->count());
         $this->assertGreaterThan(0, WasteFinding::where('analysis_job_id', $this->job->id)->count());
+        $this->assertGreaterThan(0, Recommendation::where('analysis_job_id', $this->job->id)->count());
+        $this->assertGreaterThan(0, $result['recommendations']);
         $this->assertGreaterThan(0, CreativeInsight::where('analysis_job_id', $this->job->id)->count());
         $this->assertDatabaseHas('predictive_insights', ['analysis_job_id' => $this->job->id, 'opportunity_key' => 'cta_placement']);
         $this->assertDatabaseHas('creative_insights', ['analysis_job_id' => $this->job->id, 'kind' => 'google_headline']);
@@ -138,12 +143,14 @@ class AnalysisPipelineTest extends TestCase
         $predictive = PredictiveInsight::where('analysis_job_id', $this->job->id)->count();
         $creative = CreativeInsight::where('analysis_job_id', $this->job->id)->count();
         $waste = WasteFinding::where('analysis_job_id', $this->job->id)->count();
+        $recommendations = Recommendation::where('analysis_job_id', $this->job->id)->count();
 
         $this->pipeline->run($this->job->refresh());
 
         $this->assertSame($predictive, PredictiveInsight::where('analysis_job_id', $this->job->id)->count());
         $this->assertSame($creative, CreativeInsight::where('analysis_job_id', $this->job->id)->count());
         $this->assertSame($waste, WasteFinding::where('analysis_job_id', $this->job->id)->count());
+        $this->assertSame($recommendations, Recommendation::where('analysis_job_id', $this->job->id)->count());
     }
 
     public function test_reprocess_command_reruns_and_reports_scores(): void
@@ -175,6 +182,7 @@ class AnalysisPipelineTest extends TestCase
             new LeadReadinessService(),
             new WastedSpendAnalysisService(),
             new CreativeAnalysisService(),
+            new MarketingAdvisorService(new \App\Services\Advisor\RuleBasedAdvisor()),
         );
         $result = $pipeline->run($this->job->refresh());
 

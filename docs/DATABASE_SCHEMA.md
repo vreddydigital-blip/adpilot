@@ -137,9 +137,9 @@ Indexes: unique `analysis_job_id`, indexed `website_id` (from FK).
 ### marketing_scores
 
 - `id`, `website_id` (FK, cascade, indexed), `analysis_job_id` (FK, cascade)
-- `module_key` string(60) - `campaign_readiness`, `conversion_opportunity` or `lead_intelligence` (Phase 4); later phases add more module keys
-- `score` unsigned tiny int nullable, `methodology` string(80) default `heuristic` (method label stored with the score), `version` string(20) `v1.0` (scoring version)
-- `breakdown` json - per module: campaign readiness stores `criteria[]` (score, weight, evidence, explanation, confidence, recommendation), `confidence`, `methodology`, `summary`; conversion opportunity stores `label`, `methodology`, `opportunities[]`, `high`/`medium`/`low` key buckets; lead intelligence stores `label`, `methodology`, `summary`, `forms[]`, `contact_methods`, `confidence`
+- `module_key` string(60) - `campaign_readiness` (Phase 3), `conversion_opportunity`/`lead_intelligence` (Phase 4), `marketing_advisor` (Phase 5)
+- `score` unsigned tiny int nullable, `methodology` string(80) default `heuristic` (method label stored with the score; the advisor row stores `rule_based`), `version` string(20) `v1.0` (scoring version)
+- `breakdown` json - per module: campaign readiness stores `criteria[]` (score, weight, evidence, explanation, confidence, recommendation), `confidence`, `methodology`, `summary`; conversion opportunity stores `label`, `methodology`, `opportunities[]`, `high`/`medium`/`low` key buckets; lead intelligence stores `label`, `methodology`, `summary`, `forms[]`, `contact_methods`, `confidence`; marketing advisor stores `label`, `engine`, `engine_note`, `methodology`, `summary`, `scores` (map of the four module scores), `priorities` (high/medium/low counts), `disclaimer`
 - `computed_at` timestamp nullable, timestamps
 
 Constraints: **unique (`analysis_job_id`, `module_key`)** (idempotent re-processing), index (`website_id`, `module_key`), index `website_id`.
@@ -204,10 +204,24 @@ Indexes: (`analysis_job_id`, `kind`), (`website_id`, `kind`). Rows are replaced 
 
 Indexes: (`website_id`, `created_at`), (`user_id`, `created_at`). Per-user ownership is enforced (website view authorization + user_id match); scenarios are never crawl-derived.
 
+## Intelligence table (created in Phase 5)
+
+### recommendations
+
+- `id`, `website_id` (FK, cascade, indexed), `analysis_job_id` (FK, cascade)
+- `recommendation_key` string(60) (consolidated topic key, e.g. `mobile_usability`, `lead_capture`, `cta_effectiveness`)
+- `priority` string(20) (`high`|`medium`|`low`), `confidence` string(20) nullable
+- `title` string(255), `rationale` text nullable (`N cross-module finding(s) consolidated from: <modules>`), `action` text nullable
+- `evidence` json nullable (de-duplicated evidence lines, max 4), `module_source` json nullable (array of contributing module keys)
+- `effort` string(20) nullable, `expected_impact` string(40) nullable, `position` unsigned tiny int (1..n within the job)
+- `source` string(60) default `rule_based_v1`
+- timestamps
+
+Indexes: (`analysis_job_id`, `priority`), (`website_id`, `priority`), index `website_id`. Rows are replaced (deleted + re-inserted) on each pipeline run for a job.
+
 ## Planned tables (created in later phases)
 
 technical: `performance_audits` (deferred until a Lighthouse/PageSpeed-like source exists)
-intelligence: `recommendations` (Phase 5 AI Marketing Advisor)
 reporting/admin: `reports`, `integration_settings`
 
 TiDB compatibility notes: the schema uses standard migrations; website URLs exceed TiDB index-key limits only in composite unique constraints, which is why the 64-char `url_hash` is used for the unique key.

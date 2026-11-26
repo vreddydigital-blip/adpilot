@@ -9,6 +9,7 @@ use App\Models\CreativeInsight;
 use App\Models\LeadInsight;
 use App\Models\MarketingScore;
 use App\Models\PredictiveInsight;
+use App\Models\Recommendation;
 use App\Models\TechnicalAudit;
 use App\Models\WasteFinding;
 use Illuminate\Support\Arr;
@@ -24,6 +25,7 @@ class AnalysisPipeline
         private LeadReadinessService $leadReadinessService,
         private WastedSpendAnalysisService $wastedSpendAnalysisService,
         private CreativeAnalysisService $creativeAnalysisService,
+        private MarketingAdvisorService $marketingAdvisorService,
     ) {
     }
 
@@ -156,6 +158,38 @@ class AnalysisPipeline
 
                 $creativeCount = $this->persistCreative($job, $creative);
 
+                $advisor = $this->marketingAdvisorService->advise($job);
+
+                $advisorScore = MarketingScore::updateOrCreate(
+                    ['analysis_job_id' => $job->id, 'module_key' => MarketingAdvisorService::MODULE_KEY],
+                    [
+                        'website_id' => $job->website_id,
+                        'score' => $advisor['advisor_score'],
+                        'methodology' => 'rule_based',
+                        'version' => $advisor['version'],
+                        'breakdown' => [
+                            'label' => $advisor['label'],
+                            'engine' => $advisor['engine'],
+                            'engine_note' => $advisor['engine_note'],
+                            'methodology' => $advisor['methodology'],
+                            'summary' => $advisor['summary'],
+                            'scores' => $advisor['scores'],
+                            'priorities' => $advisor['priorities'],
+                            'disclaimer' => $advisor['disclaimer'],
+                        ],
+                        'computed_at' => now(),
+                    ],
+                );
+
+                Recommendation::where('analysis_job_id', $job->id)->delete();
+
+                $recommendationCount = 0;
+
+                foreach ($advisor['recommendations'] as $item) {
+                    Recommendation::create([...$item, 'website_id' => $job->website_id, 'analysis_job_id' => $job->id]);
+                    $recommendationCount++;
+                }
+
                 return [
                     'technical_score' => $audit->score,
                     'campaign_score' => $score->score,
@@ -164,6 +198,8 @@ class AnalysisPipeline
                     'insights' => count($insights),
                     'findings' => count($waste['findings']),
                     'creative_items' => $creativeCount,
+                    'advisor_score' => $advisorScore->score,
+                    'recommendations' => $recommendationCount,
                     'confidence' => $readiness['confidence'],
                 ];
             });

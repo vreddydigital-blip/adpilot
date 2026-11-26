@@ -6,6 +6,7 @@
         'wasted' => ['label' => 'Wasted Spend', 'route' => 'websites.wasted-spend'],
         'lead' => ['label' => 'Lead Intelligence', 'route' => 'websites.lead'],
         'creative' => ['label' => 'Ad Creative', 'route' => 'websites.creative'],
+        'advisor' => ['label' => 'AI Advisor', 'route' => 'websites.advisor'],
     ];
 @endphp
 <nav class="flex flex-wrap gap-2" aria-label="Intelligence modules">
@@ -16,7 +17,4 @@
             {{ $tab['label'] }}
         </a>
     @endforeach
-    <span class="px-3 py-1.5 rounded-lg text-sm border border-slate-700/50 bg-slate-900/40 text-gray-500">
-        AI Marketing Advisor &mdash; coming in Phase 5
-    </span>
 </nav>

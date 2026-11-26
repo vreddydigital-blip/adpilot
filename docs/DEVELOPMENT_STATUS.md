@@ -1,10 +1,10 @@
 # DEVELOPMENT_STATUS
 
-Last updated: Phase 4 completion.
+Last updated: Phase 5 completion.
 
 ## Current phase
 
-**PHASE 4 - ALL SEVEN MODULES BACKEND + MODULE 2-6 (complete; Module 7 AI Marketing Advisor is Phase 5 by design).** Phases 5-8 not started.
+**PHASE 5 - MODULE 7 AI MARKETING ADVISOR (complete).** Phases 6-8 not started.
 
 Deployment target decision: **Render (free web service) + TiDB Cloud Starter + GitHub Actions crawler** is the Phase 8 target (user-approved). Hostless remains documented as a fallback.
 
@@ -59,18 +59,29 @@ Deployment target decision: **Render (free web service) + TiDB Cloud Starter + G
 - UI: module tab navigation on every website page; five working per-website screens (Predictive Analytics, Budget Intelligence with save/delete scenario forms, Wasted Spend, Lead Intelligence, Ad Creative) with empty states; website overview placeholder note updated (AI advisor coming in Phase 5)
 - Tests: 49 new tests over the five services, pipeline persistence, module APIs and module pages (192 total for the Laravel app)
 
+### Phase 5 - Module 7 AI Marketing Advisor (backend + API + UI)
+- `AiProvider` interface + `RuleBasedAdvisor` (`rule_based_v1`) + `MarketingAdvisorService`; external AI providers can be swapped in by binding another `AiProvider` implementation via `config/advisor.php` (`ADVISOR_ENGINE`; unknown engines fall back to `rule_based`)
+- The advisor reads only already-persisted results for the job - the four module scores, the technical audit's fail/warn checks with a recommendation, and the row-level findings from `campaign_insights`, `predictive_insights`, `lead_insights`, `waste_findings` - no re-crawl, no advertising/revenue data
+- Findings are mapped to topic buckets (lead capture, contact paths, CTA effectiveness, mobile usability, metadata quality, technical health, load performance, content depth, trust signals, offer clarity, messaging, other), consolidated with de-duplicated evidence (max 4 lines) and ranked by best contributing priority then finding count descending; at most 10 recommendations with positions 1..n
+- Advisor Priority Score persisted in `marketing_scores` (`module_key = marketing_advisor`, methodology `rule_based`): `100 - round(mean(known module scores))`, documented as a simple aggregation and explicitly not a marketing performance metric; honest engine_note ("not a large language model...not a validated ML prediction") and never-forecast disclaimer stored in the breakdown
+- Persistence: `recommendations` table (recommendation_key, priority, title, rationale, evidence, action, effort, expected_impact, confidence, module_source, position, source) with delete-then-insert idempotency; pipeline runs the advisor last so it reads the other modules' persisted results
+- API: `GET /api/websites/{id}/marketing-advisor` (auth + ownership, honest `data: null` without a completed job)
+- UI: AI Advisor screen (priority score + four module score cards, executive summary with engine/priority badges, prioritised action plan cards with rationale/evidence/action/module sources) reached from the new AI Advisor tab; the campaign page now links to it
+- Tests: 14 new tests (206 total for the Laravel app; Feature 98/364, Unit 108/387)
+
 ## Incomplete features (planned phases - never faked in UI)
 
 - `performance_audits` table deferred until a Lighthouse/PageSpeed or similar data source is available (Phase 2 crawl timing is used as a relative indicator inside the technical audit in the meantime)
-- Module 7 AI Marketing Advisor + `recommendations` table and its screen: Phase 5 (rule-based fallback + optional external AI interface)
+- External AI provider (LLM) for the advisor: interface + config are ready, but nothing external calls any AI service today; the shipped engine is the deterministic rule-based one
 - Phase 6: charts (Chart.js), historical comparison, PDF/CSV reports
 - Phase 7: security/QA audit, crawler stress tests
 - Phase 8: free hosting deployment (Render + TiDB + GitHub Actions)
 
 ## Tests executed
 
-- Laravel: `php artisan test` - **192 passed, 0 failed** (701 assertions), SQLite in-memory, PHP 8.3.22, Laravel 12 (Unit: 101/364, Feature: 91/337)
+- Laravel: `php artisan test` - **206 passed, 0 failed** (751 assertions), SQLite in-memory, PHP 8.3.22, Laravel 12 (Unit: 108/387, Feature: 98/364)
 - Crawler: `node --test crawler/test/crawler.test.js` - **21 passed, 0 failed**, Node v22.23.5
+- Live Phase 5 advisor reprocessing (executed, twice for idempotency): `analysis:reprocess` against the stored books.toscrape.com 20-page crawl kept all previous scores and added Priority score 61 (100 - mean(45,69,40,0)) and 10 prioritised recommendations consolidated from 32 module findings (#1 mobile_usability drawing on 4 modules, then metadata_quality, lead_capture, cta_effectiveness, trust_signals, contact_paths, then medium/low topics); identical output on the second run (4 scores, 10 recommendations, same leading topic)
 - Live Phase 4 reprocessing (executed, twice for idempotency): `php artisan analysis:reprocess` against the stored books.toscrape.com 20-page crawl produced Campaign Readiness 45, Technical audit 69, Conversion opportunity 40, Lead readiness 0 (correct: the store has no forms or contact links), 8 insights, 7 waste findings, 9 creative items; row counts identical across both runs (3 marketing scores, 10 predictive, 7 waste, 9 creative); spot-checked evidence matches real crawl data (H1 "All products", no viewport meta, no lead forms), confidence high
 - Live Phase 3 reprocessing (executed): `php artisan analysis:reprocess` against the same crawl produced Campaign Readiness 45/100 and Technical audit 69/100 with 8 insights; spot-checked evidence strings match real crawl data, confidence high
 - Live end-to-end (executed in this environment): registered a user via real forms over local HTTP, created a project + website, started an analysis through the real job service (dispatch honestly unconfigured -> pending), ran `php artisan analysis:run-local --all`, the crawler fetched books.toscrape.com (20 pages, bounded), the callback service persisted pages/errors/features, job became `completed`, `websites.last_analyzed_at` updated
@@ -82,7 +93,7 @@ Details in [TESTING.md](TESTING.md).
 
 ## Known bugs
 
-- None open. (Fixed during Phase 2: worker-pool early-exit race in BFS; `WebsiteFactory` ignored explicit `url` overrides; nested-heading arrays crashed callback persistence; fake-host DNS in redirect tests. Fixed during Phase 3: integer division made `$share === 1.0` false for perfect sites, so healthy sites scored "warn" instead of "pass" - shares are now cast to float. Fixed during Phase 4: missing `WasteFinding` import in the waste service; skip behavioural quirk - web module view needed `@include` partials, not anonymous component tags.)
+- None open. (Fixed during Phase 2: worker-pool early-exit race in BFS; `WebsiteFactory` ignored explicit `url` overrides; nested-heading arrays crashed callback persistence; fake-host DNS in redirect tests. Fixed during Phase 3: integer division made `$share === 1.0` false for perfect sites, so healthy sites scored "warn" instead of "pass" - shares are now cast to float. Fixed during Phase 4: missing `WasteFinding` import in the waste service; skip behavioural quirk - web module view needed `@include` partials, not anonymous component tags. Fixed during Phase 5: advisor topic slug stripped digits from keys, collapsing distinct unrecognised keys into a single topic.)
 - One transient, non-reproducible failure occurred in a single isolated Feature-suite run during Phase 3 development (test not captured before re-run); 6 subsequent full/isolated runs all pass. Being watched; no code suspect identified yet.
 
 ## Known limitations (honest)

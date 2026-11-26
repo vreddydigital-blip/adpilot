@@ -1,27 +1,28 @@
 # TESTING
 
-Last executed: Phase 4 completion. Suites: `php artisan test` (SQLite in-memory) for the Laravel app and `node --test` for the crawler package.
+Last executed: Phase 5 completion. Suites: `php artisan test` (SQLite in-memory) for the Laravel app and `node --test` for the crawler package.
 
 ## Results
 
 | Suite | Tests | Assertions | Result |
 |---|---|---|---|
-| Laravel Feature | 91 | 337 | all passing |
-| Laravel Unit | 101 | 364 | all passing |
+| Laravel Feature | 98 | 364 | all passing |
+| Laravel Unit | 108 | 387 | all passing |
 | Crawler (node:test) | 21 | 21 node asserts | all passing |
-| **Total** | **212** | **701 assertions + crawler asserts** | **all passed, 0 failed** |
+| **Total** | **227** | **751 assertions + crawler asserts** | **all passed, 0 failed** |
 
 Anomaly log: during Phase 3 development, one isolated Feature-suite run reported 1 failed / 68 passed; the failing test was not captured before re-run and the failure was never reproduced in 6 subsequent full and isolated runs (all pass). Being watched; no code suspect identified.
 
 Breakdown:
 - `tests/Unit/UrlValidatorTest.php` - 37 cases: valid URL acceptance/normalization (8 data sets), rejection of 28 invalid/dangerous URL classes, plus a whitespace-injection case.
+- `tests/Unit/Analysis/MarketingAdvisorServiceTest.php` (7) - Phase 5 advisor (see below).
 - `tests/Feature/Auth/` (Breeze) + `tests/Feature/AuthFlowTest.php` - registration, login, logout, dashboard auth wall, empty states, real-count rendering.
 - `tests/Feature/ProjectManagementTest.php` - project CRUD, per-user uniqueness, ownership denial (view/edit/update/delete), index isolation, website submission (valid/invalid/duplicate), cascade deletes, foreign-project website rejection, audit log writes.
 - `tests/Feature/AnalysisJobTest.php` - job creation, duplicate protection, re-analysis after failure, ownership denial, job history in UI.
 - `tests/Feature/ApiTest.php` - Sanctum auth wall, API CRUD, cross-user 403s, website + analysis flow, URL validation over API.
 - `tests/Feature/ProfileTest.php` - profile flows (Breeze).
-- `tests/Feature/ModuleIntelligenceApiTest.php` - Phase 4 module endpoints (see below).
-- `tests/Feature/WebsiteModulePagesTest.php` - Phase 4 module web pages (see below).
+- `tests/Feature/ModuleIntelligenceApiTest.php` (16) - Phase 4 module endpoints + Phase 5 advisor endpoint (see below).
+- `tests/Feature/WebsiteModulePagesTest.php` (11) - Phase 4 module web pages + Phase 5 advisor page (see below).
 
 ## Coverage gaps (to close in later phases)
 
@@ -86,3 +87,18 @@ Live (executed during Phase 4, outside the test runner):
 
 - `analysis:reprocess` on the real books.toscrape.com 20-page crawl: Campaign readiness 45, Technical 69, Conversion opportunity 40, Lead readiness 0 (site has no forms or contact links - correct for a scraped-books sandbox), 8 insights, 7 waste findings, 9 creative items; evidence spot-checked genuine (e.g. mobile_usability high because no viewport tag; `no_forms` because no submit-able form exists on the store).
 - Idempotency re-verified live: a second identical reprocess produced identical scores and identical row counts (3 marketing scores, 10 predictive, 7 waste, 9 creative).
+
+## Phase 5 additions
+
+Laravel (`php artisan test`, all passing; 206 tests / 751 assertions total for the app: Feature 98/364, Unit 108/387):
+
+- `tests/Unit/Analysis/MarketingAdvisorServiceTest.php` (7): honest engine/labels (engine `rule_based_v1`, engine_note "not a large language model...not a validated ML prediction", disclaimer "never forecast spend, CPA, ROAS or revenue", campaign confidence passthrough); Advisor Priority Score = 100 - mean of known module scores (45+69+40+0 -> 61) with null technical audit handled; null advisor score + honest no-results summary when no module rows exist; cross-module topic consolidation (waste `technical_viewport` + campaign mobile insight -> one `mobile_usability` recommendation with `module_source` = wasted_spend + campaign_readiness and rationale "2 cross-module finding(s)"); priority ordering high/medium/low with sequential positions 1..3 and exact priority counts; cap at 10 recommendations (12 distinct topics -> 10 emitted); summary contains the real score list and counts (`lead_capture` topic derived from finding key).
+- `tests/Feature/AnalysisPipelineTest.php` - extended: pipeline now asserts 4 `marketing_scores` rows incl. `marketing_advisor`, `recommendations` rows persisted, `result['recommendations']` count > 0, re-run replaces recommendation rows, and the mock-error pipeline constructs with the 7th (advisor) service.
+- `tests/Feature/ModuleIntelligenceApiTest.php` (+4, 16 total): `GET /api/websites/{id}/marketing-advisor` returns engine `rule_based_v1`, score, honest engine_note and ordered recommendations for the owner; honest `data: null` empty state without a completed job; 403 for other users; 401 unauthenticated.
+- `tests/Feature/WebsiteModulePagesTest.php` (+3, 11 total): advisor page renders Executive summary/Priority score/Prioritised action plan plus the engine note; honest empty state without a completed analysis; 403 for other users. The previous "Phase 5 advisor placeholder" assertion now checks the working AI Advisor tab + homepage link instead.
+
+Live (executed during Phase 5, outside the test runner):
+
+- `analysis:reprocess` re-run on the stored books.toscrape.com 20-page crawl: previous scores unchanged (Campaign 45, Technical 69, Opportunity 40, Lead 0), Priority score 61 (100 - mean(45,69,40,0)), 32 module findings consolidated into 10 prioritised recommendations (#1 mobile_usability spanning wasted_spend+campaign_readiness+technical_audit+conversion_opportunity, #2 metadata_quality, #3 lead_capture, #4 cta_effectiveness, #5 trust_signals, #6 contact_paths, then medium/low topics); summary and disclaimers verified verbatim.
+- Idempotency re-verified live: a second identical reprocess kept 4 scores + 10 recommendations with the same leading topic.
+- Bug found by these tests: the advisor topic slug stripped digits from keys, collapsing distinct unrecognised keys (`finding_1`..`finding_12`) into one topic; the topic regex now keeps digits/underscores.

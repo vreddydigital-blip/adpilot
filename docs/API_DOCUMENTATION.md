@@ -99,9 +99,19 @@ Requires auth; ownership + analyze ability enforced; rate-limited to 20/min. Bod
 
 Returns `201` with `{ website_id, scenario_id, label, channel, results: { source_inputs, channel, scenarios[3] }, disclaimer }`. Channel factors are applied to CPC and both rates before scenario factors. Invalid input: `422`. Non-owner: `403`.
 
+### GET /api/websites/{id}/marketing-advisor (Phase 5)
+
+Requires Sanctum auth; ownership enforced via the website policy; throttle 60/min.
+
+- Without a completed analysis: `200` with `data: null` and `message: "No completed analysis yet. Run an analysis first; marketing_advisor results are unavailable until a crawl has completed."`
+- With a completed analysis: `{ website_id, module: "marketing_advisor", analysis_job: { uuid, finished_at }, data: { score, version, breakdown, recommendations } }`
+- `score` = Advisor Priority Score (100 - mean of known module scores; documented as a simple aggregation, not a performance metric)
+- `breakdown` = `{ label, engine, engine_note, methodology, summary, scores, priorities, disclaimer }`; `engine_note` states that the rule-based engine is not a large language model and not a validated ML prediction
+- `recommendations[]` = ordered rows (priority high→low then position) with `recommendation_key`, `priority`, `title`, `rationale`, `evidence[]`, `action`, `effort`, `expected_impact`, `confidence`, `module_source[]`, `position`, `source` (`rule_based_v1`)
+
 ## Planned endpoints (later phases)
 
-`/api/websites/{id}/overview`, `/api/websites/{id}/marketing-advisor` (Phase 5), `/api/reports/{id}` (Phase 6), `/api/internal/crawler-callback` (implemented - see below).
+`/api/websites/{id}/overview`, `/api/reports/{id}` (Phase 6), `/api/internal/crawler-callback` (implemented - see below).
 
 ### GET /api/websites/{id}/campaign-intelligence (Phase 3)
 

@@ -10,7 +10,7 @@ class AnalysisReprocess extends Command
 {
     protected $signature = 'analysis:reprocess {job : The analysis job UUID to re-run intelligence services for}';
 
-    protected $description = 'Re-run all intelligence modules (technical, readiness, predictive, lead, waste, creative) for a completed analysis job';
+    protected $description = 'Re-run all intelligence modules (technical, readiness, predictive, lead, waste, creative, advisor) for a completed analysis job';
 
     public function handle(AnalysisPipeline $pipeline): int
     {
@@ -43,6 +43,8 @@ class AnalysisReprocess extends Command
         $this->info('Insights stored: '.$result['insights']);
         $this->info('Waste findings stored: '.$result['findings']);
         $this->info('Creative items stored: '.$result['creative_items']);
+        $this->info('Priority score: '.($result['advisor_score'] ?? 'no score'));
+        $this->info('Advisor recommendations stored: '.$result['recommendations']);
         $this->line('Confidence: '.$result['confidence']);
 
         return self::SUCCESS;

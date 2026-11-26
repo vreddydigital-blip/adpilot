@@ -8,6 +8,7 @@ use App\Models\CreativeInsight;
 use App\Models\LeadInsight;
 use App\Models\MarketingScore;
 use App\Models\PredictiveInsight;
+use App\Models\Recommendation;
 use App\Models\WasteFinding;
 use App\Models\Website;
 use App\Services\Analysis\BudgetCalculationService;
@@ -83,6 +84,27 @@ class WebsiteModuleController extends Controller
             'metaPrimary' => $items->where('kind', 'meta_primary_text')->values(),
             'angles' => $items->where('kind', 'messaging_angle')->values(),
             'messageMatch' => $items->firstWhere('kind', 'message_match')?->payload,
+        ]);
+    }
+
+    public function advisor(Website $website): View
+    {
+        $this->authorize('view', $website);
+
+        $data = $this->moduleData($website, 'marketing_advisor');
+
+        $recommendations = $data['job'] === null
+            ? collect()
+            : Recommendation::where('analysis_job_id', $data['job']->id)
+                ->orderByRaw("case priority when 'high' then 0 when 'medium' then 1 else 2 end")
+                ->orderBy('position')
+                ->get();
+
+        return view('websites.modules.advisor', [
+            'website' => $website,
+            'job' => $data['job'],
+            'score' => $data['score'],
+            'recommendations' => $recommendations,
         ]);
     }
 

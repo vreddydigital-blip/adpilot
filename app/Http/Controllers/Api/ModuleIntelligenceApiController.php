@@ -9,12 +9,14 @@ use App\Models\CreativeInsight;
 use App\Models\LeadInsight;
 use App\Models\MarketingScore;
 use App\Models\PredictiveInsight;
+use App\Models\Recommendation;
 use App\Models\WasteFinding;
 use App\Models\Website;
 use App\Services\Analysis\BudgetCalculationService;
 use App\Services\Analysis\ConversionOpportunityService;
 use App\Services\Analysis\CreativeAnalysisService;
 use App\Services\Analysis\LeadReadinessService;
+use App\Services\Analysis\MarketingAdvisorService;
 use App\Services\Analysis\WastedSpendAnalysisService;
 use Illuminate\Http\JsonResponse;
 
@@ -157,6 +159,35 @@ class ModuleIntelligenceApiController extends Controller
                 'messaging_angles' => $items->where('kind', 'messaging_angle')->values(),
                 'message_match' => $messageMatch,
                 'disclaimer' => 'Deterministic templates assembled from your website\'s own titles, headings, descriptions and CTA labels. No CTR or conversion predictions are made.',
+            ],
+        ]);
+    }
+
+    public function marketingAdvisor(Website $website): JsonResponse
+    {
+        $this->authorize('view', $website);
+
+        $job = $website->analysisJobs()->where('status', 'completed')->latest()->first();
+
+        if ($job === null) {
+            return $this->payload($website, MarketingAdvisorService::MODULE_KEY);
+        }
+
+        $score = $this->scoreRow($job->id, MarketingAdvisorService::MODULE_KEY);
+        $recommendations = Recommendation::where('analysis_job_id', $job->id)
+            ->orderByRaw("case priority when 'high' then 0 when 'medium' then 1 else 2 end")
+            ->orderBy('position')
+            ->get();
+
+        return response()->json([
+            'website_id' => $website->id,
+            'module' => MarketingAdvisorService::MODULE_KEY,
+            'analysis_job' => ['uuid' => $job->uuid, 'finished_at' => $job->finished_at?->toISOString()],
+            'data' => [
+                'score' => $score?->score,
+                'version' => $score?->version,
+                'breakdown' => $score?->breakdown,
+                'recommendations' => $recommendations,
             ],
         ]);
     }
