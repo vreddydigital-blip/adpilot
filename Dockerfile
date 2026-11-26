@@ -1,9 +1,19 @@
 # AdPilot AI production container (Render free web service).
+
+FROM node:22-alpine AS assets
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY resources ./resources
+COPY vite.config.js ./
+COPY tailwind.config.js postcss.config.js ./
+RUN npm run build
+
 FROM php:8.3-cli
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        git unzip libzip-dev \
-    && docker-php-ext-install pdo_mysql bcmath opcache zip \
+RUN apt-get update && apt-get install -y --no-install-recommends 
+        git unzip libzip-dev 
+    && docker-php-ext-install pdo_mysql bcmath opcache zip 
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
@@ -14,10 +24,9 @@ COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-scripts --no-interaction --no-progress --prefer-dist --optimize-autoloader
 
 COPY . .
+COPY --from=assets /app/public/build ./public/build
 RUN composer dump-autoload --optimize
 
-# Render uses healthCheckPath /up from render.yaml; no in-container HEALTHCHECK needed.
-# Migrations run at container start (env vars present by then); APP_KEY is required.
 ENV PORT=10000
 EXPOSE 10000
 
